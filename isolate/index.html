@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <link rel="icon" href="/logo.svg" type="image/svg+xml" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#354638" />
+  <script>
+    // Resolve the saved reading theme before paint to avoid a light flash.
+    (function () {
+      try {
+        var saved = localStorage.getItem("bookverse-theme");
+        var dark =
+          saved === "dark" ||
+          (saved !== "light" &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches);
+        if (dark) document.documentElement.classList.add("dark");
+        document.documentElement.style.colorScheme = dark ? "dark" : "light";
+      } catch (error) {}
+    })();
+  </script>
+  <meta
+    name="description"
+    content="Our BookVerse — a private shared reading room for two readers. Books, shelves, PDFs, streaks and stories."
+  />
+  <title>Our BookVerse — Two readers, one universe of stories</title>
+  <script type="module" crossorigin src="/assets/index-DbRgBqyA.js"></script>
+  <link rel="modulepreload" crossorigin href="/assets/react-vendor-C1jDGOeX.js">
+  <link rel="modulepreload" crossorigin href="/assets/framer-motion-BtPF8sI5.js">
+  <link rel="modulepreload" crossorigin href="/assets/radix-ui-Ef9W16GN.js">
+  <link rel="modulepreload" crossorigin href="/assets/charts-kekG_dwp.js">
+  <link rel="stylesheet" crossorigin href="/assets/index-CViDHxvb.css">
+</head>
+
+
+<body>
+  <div id="root"></div>
+</body>
+
+</html>

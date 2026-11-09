@@ -1,0 +1,314 @@
+export function HeroReadingScene() {
+  return (
+    <svg
+      viewBox="0 0 680 430"
+      className="h-full w-full overflow-visible"
+      aria-hidden
+      role="img"
+    >
+      <defs>
+        <linearGradient id="hero-cream" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#f6ead2" />
+          <stop offset="100%" stopColor="#e6d3b0" />
+        </linearGradient>
+        <linearGradient id="hero-green" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#69765e" />
+          <stop offset="100%" stopColor="#465541" />
+        </linearGradient>
+        <linearGradient id="hero-blush" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#ead8ba" />
+          <stop offset="100%" stopColor="#c9ad87" />
+        </linearGradient>
+        <radialGradient id="hero-glow">
+          <stop offset="0%" stopColor="#fff4ce" stopOpacity="0.8" />
+          <stop offset="100%" stopColor="#fff4ce" stopOpacity="0" />
+        </radialGradient>
+        <filter id="hero-soft" x="-30%" y="-30%" width="160%" height="160%">
+          <feGaussianBlur stdDeviation="1.1" />
+        </filter>
+      </defs>
+
+      {/* arched window and night garden */}
+      <g opacity="0.9">
+        <path
+          d="M420 311V128c0-47 37-84 84-84s84 37 84 84v183"
+          fill="#efe3ca"
+          stroke="#5e5140"
+          strokeWidth="1.4"
+        />
+        <path
+          d="M434 304V129c0-39 31-71 70-71s70 32 70 71v175"
+          fill="#e5ddc8"
+          stroke="#a9987e"
+          strokeWidth="0.9"
+        />
+        <path
+          d="M504 58v246M434 177h140M504 58c-38 16-62 52-70 92M504 58c38 16 62 52 70 92"
+          fill="none"
+          stroke="#86775f"
+          strokeWidth="1"
+        />
+        <circle cx="471" cy="127" r="31" fill="url(#hero-glow)" />
+        <path
+          d="M478 105c-11 0-19 8-19 18 0 6 3 11 8 14-3-5-4-9-3-14 2-8 8-14 17-16-1-1-2-2-3-2Z"
+          fill="#b8a47e"
+          opacity="0.8"
+        />
+        {[
+          [456, 83],
+          [530, 92],
+          [553, 142],
+          [470, 157],
+          [530, 195],
+        ].map(([x, y], index) => (
+          <path
+            key={index}
+            d={`M${x - 4} ${y}h8M${x} ${y - 4}v8`}
+            stroke="#b39e77"
+            strokeWidth="0.8"
+            opacity="0.7"
+          />
+        ))}
+        <path
+          d="M434 253c15-21 36-31 58-32M553 217c14 12 21 29 21 48"
+          fill="none"
+          stroke="#7e8a6c"
+          strokeWidth="1.2"
+          opacity="0.7"
+        />
+      </g>
+
+      {/* botanical arch */}
+      <g fill="none" stroke="#7b8669" strokeWidth="1.1" opacity="0.65">
+        <path d="M395 323c-40-88-35-197 20-274 62-87 165-96 228-14 51 67 52 176 4 288" />
+        <path d="M411 96c-17 35-21 70-12 106M610 96c22 32 31 68 27 108" />
+        {[0, 1, 2, 3, 4, 5, 6, 7].map((index) => (
+          <ellipse
+            key={index}
+            cx={index < 4 ? 402 + index * 2 : 622 + (index - 4) * 2}
+            cy={115 + index * 25}
+            rx="10"
+            ry="4"
+            fill="#7b8669"
+            opacity="0.42"
+            transform={`rotate(${index < 4 ? -38 : 38} ${index < 4 ? 402 + index * 2 : 622 + (index - 4) * 2} ${115 + index * 25})`}
+          />
+        ))}
+      </g>
+
+      {/* floor / bench */}
+      <path
+        d="M25 392c130-13 242-18 335-14 105 4 210 12 303 25"
+        fill="none"
+        stroke="#766653"
+        strokeWidth="1.1"
+        opacity="0.5"
+      />
+      <ellipse cx="350" cy="391" rx="280" ry="17" fill="#7e6e57" opacity="0.1" />
+
+      {/* book stacks */}
+      <g>
+        <path d="M63 341h144l-7 18H70l-7-18Z" fill="#8d6040" stroke="#5e432e" strokeWidth="0.7" />
+        <path d="M76 320h130l-5 19H81l-5-19Z" fill="#53664f" stroke="#43513e" strokeWidth="0.7" />
+        <path d="M69 297h137l-5 21H74l-5-21Z" fill="#c5a46e" stroke="#8e744c" strokeWidth="0.7" />
+        <path d="M84 278h118l-4 18H88l-4-18Z" fill="#a86f50" stroke="#7d513b" strokeWidth="0.7" />
+        <path d="M74 326h132M80 306h130M92 286h116" stroke="#f3dfb8" strokeWidth="0.9" opacity="0.4" />
+        <path d="M56 359h156l-8 14H64l-8-14Z" fill="#6f4d31" opacity="0.9" />
+      </g>
+      <g transform="translate(470 305)">
+        <path d="M8 59h128l-6 16H14L8 59Z" fill="#9c6c44" stroke="#6a4a2e" strokeWidth="0.7" />
+        <path d="M20 41h115l-5 17H25l-5-17Z" fill="#b68f5a" stroke="#87673e" strokeWidth="0.7" />
+        <path d="M13 22h124l-5 18H18l-5-18Z" fill="#d1b47c" stroke="#a08052" strokeWidth="0.7" />
+        <path d="M31 6h101l-4 15H36l-5-15Z" fill="#9a6245" stroke="#754a35" strokeWidth="0.7" />
+        <path d="M20 46h114M14 28h121M38 12h92" stroke="#f4e3c2" strokeWidth="0.9" opacity="0.44" />
+      </g>
+
+      {/* cat curled on the right stack */}
+      <g transform="translate(500 255)">
+        <path
+          d="M19 34c-7-12 1-27 18-30 19-4 33 9 33 23 0 9-8 16-22 16H30c-5 0-8-3-11-9Z"
+          fill="#c98b55"
+          stroke="#80502d"
+          strokeWidth="1"
+        />
+        <path
+          d="M65 30c9 1 16 7 14 15-2 7-10 10-19 8"
+          fill="none"
+          stroke="#9a6438"
+          strokeWidth="5"
+          strokeLinecap="round"
+        />
+        <path d="M22 10l4-8 7 7M47 7l6-8 4 10" fill="#c98b55" stroke="#80502d" strokeWidth="0.8" />
+        <path
+          d="M31 19c4-4 9-4 13 0M39 30c5 2 11 1 15-2M25 30c4 2 8 2 12 0"
+          fill="none"
+          stroke="#81512f"
+          strokeWidth="0.8"
+          strokeLinecap="round"
+          opacity="0.7"
+        />
+        <path d="M38 40c2 3 6 3 8 0" fill="none" stroke="#f4d8b2" strokeWidth="1.2" />
+      </g>
+
+      {/* seated readers, seen from behind */}
+      <g>
+        {/* man */}
+        <path
+          d="M184 353c-12-40-3-79 24-97 20-14 47-11 63 7 17 20 24 55 14 90-3 11-10 16-21 16h-67c-7 0-11-6-13-16Z"
+          fill="url(#hero-green)"
+          stroke="#3f4d3a"
+          strokeWidth="1.2"
+        />
+        <path
+          d="M220 267c-4-13 3-25 15-26 12-2 23 7 23 20 0 6-3 10-7 13"
+          fill="#d8b490"
+          stroke="#8a6647"
+          strokeWidth="0.9"
+        />
+        <path
+          d="M208 260c-6-19 1-36 17-43 15-6 32 0 39 14 5 11 3 20 0 29-3-12-8-19-19-22-13-3-22 3-27 15-2 6-1 15 2 22-7-3-11-8-12-15Z"
+          fill="#4d4033"
+          stroke="#3f3429"
+          strokeWidth="1"
+        />
+        <path
+          d="M211 289c-8 20-9 44-4 67M271 291c9 18 11 42 6 65"
+          fill="none"
+          stroke="#394733"
+          strokeWidth="14"
+          strokeLinecap="round"
+          opacity="0.65"
+        />
+        <path
+          d="M203 306c19 7 48 8 72-3M206 330c21 8 51 8 75-2"
+          fill="none"
+          stroke="#5f7055"
+          strokeWidth="1"
+          opacity="0.8"
+        />
+        <path
+          d="M207 326c12 11 31 15 48 12 8-2 16-7 21-13"
+          fill="none"
+          stroke="#d9c7a5"
+          strokeWidth="1"
+        />
+        {/* woman */}
+        <path
+          d="M281 356c-10-38-2-75 23-93 20-14 48-11 64 7 18 21 24 55 14 89-3 11-10 17-21 17h-66c-8 0-12-6-14-20Z"
+          fill="url(#hero-blush)"
+          stroke="#9c815f"
+          strokeWidth="1.2"
+        />
+        <path
+          d="M324 269c-5-13 2-25 14-26 12-2 23 7 23 20 0 7-4 12-8 15"
+          fill="#d8ae8d"
+          stroke="#91694b"
+          strokeWidth="0.9"
+        />
+        <path
+          d="M310 264c-6-21 2-39 20-45 18-7 37 2 43 20 4 12 0 25-5 35-1-15-7-25-19-29-14-4-26 2-33 17-2 5-3 12-1 18-4-4-5-9-5-16Z"
+          fill="#7a5941"
+          stroke="#624732"
+          strokeWidth="1"
+        />
+        <path
+          d="M347 255c9-18 25-27 43-25 14 2 24 12 25 23-14-5-25-2-35 8-7 7-11 16-11 26-11-8-18-19-22-32Z"
+          fill="#8c6547"
+          stroke="#6c4d36"
+          strokeWidth="1"
+        />
+        <path
+          d="M308 295c-8 20-9 44-4 65M370 296c8 19 10 42 5 63"
+          fill="none"
+          stroke="#c1a681"
+          strokeWidth="15"
+          strokeLinecap="round"
+          opacity="0.65"
+        />
+        <path
+          d="M302 309c20 8 49 8 73-3M305 333c22 7 51 7 74-3"
+          fill="none"
+          stroke="#d8c09b"
+          strokeWidth="1"
+          opacity="0.9"
+        />
+      </g>
+
+      {/* open books in their hands */}
+      <g>
+        <path
+          d="M272 327c17-8 37-11 55-7l7 3v-24c-18-5-39-3-55 7l-7 4v17Z"
+          fill="#f2e2c2"
+          stroke="#6f5b43"
+          strokeWidth="0.9"
+        />
+        <path
+          d="M334 323c18-5 37-3 52 5l1 16-5-2c-16-7-32-8-48-4v-15Z"
+          fill="#f7e9ce"
+          stroke="#6f5b43"
+          strokeWidth="0.9"
+        />
+        <path d="M275 310c13-5 28-6 42-3M280 319c11-4 23-4 34-2" stroke="#a38e6f" strokeWidth="0.7" />
+        <path d="M341 307c14-2 28 1 39 6M347 316c10-1 21 1 29 4" stroke="#a38e6f" strokeWidth="0.7" />
+      </g>
+
+      {/* plant */}
+      <g transform="translate(596 247)">
+        <path
+          d="M30 84c-4-31 2-56 18-74M31 60C17 45 12 26 19 10M43 66c8-24 25-36 47-38M48 77c16-7 31-3 42 10"
+          fill="none"
+          stroke="#65715a"
+          strokeWidth="1.3"
+          strokeLinecap="round"
+        />
+        {[
+          [17, 37, -45],
+          [30, 20, -12],
+          [50, 38, 32],
+          [72, 45, 50],
+          [37, 59, -28],
+          [75, 66, 28],
+        ].map(([x, y, rotate], index) => (
+          <ellipse
+            key={index}
+            cx={x}
+            cy={y}
+            rx="10"
+            ry="4.5"
+            fill="#7d8969"
+            opacity="0.75"
+            transform={`rotate(${rotate} ${x} ${y})`}
+          />
+        ))}
+        <path d="M21 83h57l-6 32H28l-7-32Z" fill="#b47d57" stroke="#825b3d" strokeWidth="0.8" />
+        <path d="M21 83h57l-2 7H23l-2-7Z" fill="#cb9269" />
+        <path d="M67 70c12-9 20-8 27-1" fill="none" stroke="#66745a" strokeWidth="2" opacity="0.8" />
+      </g>
+
+      {/* floating pages and sprigs */}
+      <g fill="#f4e6ca" stroke="#8e795c" strokeWidth="0.7" opacity="0.8">
+        <path d="M142 92c15-10 29-15 43-16l3 30c-16 1-30 6-44 15l-2-29Z" transform="rotate(11 142 92)" />
+        <path d="M546 92c13 3 25 9 36 18l-19 20c-10-9-21-15-34-18l17-20Z" transform="rotate(-8 546 92)" />
+        <path d="M599 200c10 2 19 6 27 12l-14 15c-8-6-16-10-25-12l12-15Z" transform="rotate(7 599 200)" />
+      </g>
+      <g fill="none" stroke="#8c9678" strokeWidth="1.1" opacity="0.75">
+        <path d="M151 56c9 19 20 37 35 51M166 71c-9 1-17 5-23 12M175 84c9 0 17 3 24 8" />
+        <path d="M111 176c-9 15-9 31 0 45M111 191c-9-4-17-3-24 2M111 202c8-5 17-5 25-1" />
+        <path d="M581 150c17 5 29 16 36 32M596 161c-2 9 0 17 4 24M606 169c8-2 15-1 22 2" />
+      </g>
+      <g fill="#c8a86f" opacity="0.9">
+        {[
+          [126, 114],
+          [197, 100],
+          [579, 219],
+          [562, 306],
+        ].map(([x, y], index) => (
+          <path
+            key={index}
+            d={`M${x} ${y - 5}c.4 3 2 4.6 5 5-3 .4-4.6 2-5 5-.4-3-2-4.6-5-5 3-.4 4.6-2 5-5Z`}
+          />
+        ))}
+      </g>
+    </svg>
+  );
+}
