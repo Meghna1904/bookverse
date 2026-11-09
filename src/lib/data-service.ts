@@ -60,6 +60,37 @@ function readerStreak(sessions: Row[], readerId: string) {
   );
 }
 
+function pagesReadForReader(readerId: string, allBooks: Row[], allRecords: Row[], allSessions: Row[]) {
+  const booksById = new Map(allBooks.map((book) => [book.id, book]));
+  const recordsByBook = new Map(
+    allRecords
+      .filter((record) => record.readerId === readerId)
+      .map((record) => [record.bookId, record]),
+  );
+  const sessionPagesByBook = new Map<string, number>();
+  let unassignedPages = 0;
+
+  for (const session of allSessions) {
+    if (session.readerId !== readerId) continue;
+    const pages = Number(session.pages) || 0;
+    if (session.bookId) {
+      sessionPagesByBook.set(session.bookId, (sessionPagesByBook.get(session.bookId) ?? 0) + pages);
+    } else {
+      unassignedPages += pages;
+    }
+  }
+
+  const bookIds = new Set([...recordsByBook.keys(), ...sessionPagesByBook.keys()]);
+  return unassignedPages + [...bookIds].reduce((total, bookId) => {
+    const record = recordsByBook.get(bookId);
+    const book = booksById.get(bookId);
+    const loggedPages = sessionPagesByBook.get(bookId) ?? 0;
+    const recordedPage = Number(record?.currentPage) || 0;
+    const completedPageCount = record?.status === "completed" ? Number(book?.pageCount) || 0 : 0;
+    return total + Math.max(loggedPages, recordedPage, completedPageCount);
+  }, 0);
+}
+
 async function rows(table: string): Promise<Row[]> {
   const { data, error } = await requireSupabase().from(table).select("*");
   if (error) throw error;
@@ -379,7 +410,7 @@ async function profileOverview() {
       favoriteGenres: person.favoriteGenres ?? [], languages: person.languages ?? ["English"], shareActivity: person.shareActivity ?? true,
       isSample: false, isMe: person.id === currentId(), email: null, joinedAt: person.joinedAt,
       stats: { currentStreak: streak.current, bestStreak: streak.best, readingDays: streak.days.size,
-        weekDays: 0, booksCompleted: completed.length, pagesRead: personSessions.reduce((a, s) => a + s.pages, 0), minutesRead: personSessions.reduce((a, s) => a + s.minutes, 0),
+        weekDays: 0, booksCompleted: completed.length, pagesRead: pagesReadForReader(person.id, allBooks, allRecords, allSessions), minutesRead: personSessions.reduce((a, s) => a + s.minutes, 0),
         averageRating: ratings.length ? Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length * 10) / 10 : null }, privateActivity: false,
       reading: personRecords.filter((record) => record.status === "reading").map((record) => ({ record, book: byBook.get(record.bookId) })).filter((item) => item.book),
       finished: completed.map((record) => ({ record, book: byBook.get(record.bookId) })).filter((item) => item.book),
@@ -445,7 +476,7 @@ async function homeStats() {
       totalDays: 0,
       booksCompleted: finishedIds.size,
       readingRecordsCompleted: completed.length,
-      pagesRead: allSessions.reduce((sum, session) => sum + session.pages, 0),
+      pagesRead: people.reduce((sum, person) => sum + pagesReadForReader(person.id, allBooks, allRecords, allSessions), 0),
       minutesRead: allSessions.reduce((sum, session) => sum + session.minutes, 0),
       currentlyReading: grouped.size,
       sharedBooksCompleted: 0,
@@ -477,7 +508,7 @@ async function statsPage() {
     const rr = completed.filter((record) => record.readerId === person.id);
     const rated = rr.map((record) => record.rating).filter((rating) => typeof rating === "number");
     return { userId: person.id, displayName: person.displayName, isSample: false, avatarUrl: person.avatarUrl ?? null,
-      booksCompleted: rr.length, pagesRead: ss.reduce((a,s)=>a+s.pages,0), minutesRead: ss.reduce((a,s)=>a+s.minutes,0), currentStreak: streak.current,
+      booksCompleted: rr.length, pagesRead: pagesReadForReader(person.id, allBooks, allRecords, allSessions), minutesRead: ss.reduce((a,s)=>a+s.minutes,0), currentStreak: streak.current,
       bestStreak: streak.best, readingDays: streak.days.size, currentlyReading: allRecords.filter((record)=>record.readerId===person.id&&record.status==="reading").length,
       averageRating: rated.length ? Math.round(rated.reduce((a,b)=>a+b,0)/rated.length*10)/10 : null, ratingsGiven: rated.length,
       milestones: [7,14,30,60,100].map((days)=>({days,achieved:streak.best>=days,shared:false})) };
@@ -506,7 +537,7 @@ async function statsPage() {
     return { dayKey: key, readers: flags, shared: flags.length === 2 && flags.every(Boolean) };
   });
   const monthly = Array.from({length:6},(_,i)=>{const date=new Date();date.setDate(1);date.setMonth(date.getMonth()-(5-i));const key=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}`;const ms=allSessions.filter((s)=>s.dayKey.startsWith(key));return{label:date.toLocaleString("en",{month:"short"}),pages:people.map((p)=>ms.filter((s)=>s.readerId===p.id).reduce((a,s)=>a+s.pages,0)),minutes:people.map((p)=>ms.filter((s)=>s.readerId===p.id).reduce((a,s)=>a+s.minutes,0)),books:people.map((p)=>completed.filter((r)=>r.readerId===p.id&&String(r.completionDate??"").startsWith(key)).length)};});
-  const totalPagesRead = allSessions.reduce((sum, session) => sum + session.pages, 0);
+  const totalPagesRead = readers.reduce((sum, reader) => sum + reader.pagesRead, 0);
   const totalMinutesRead = allSessions.reduce((sum, session) => sum + session.minutes, 0);
   return {
     readers,

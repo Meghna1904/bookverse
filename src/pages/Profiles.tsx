@@ -251,22 +251,29 @@ export default function Profiles() {
               description={`${person.wishlist.length} book${person.wishlist.length === 1 ? "" : "s"} saved`}
             />
             {person.wishlist.length ? (
-              <ul className="space-y-1.5">
-                {person.wishlist.slice(0, 5).map(({ item, book }) => (
-                  <li
-                    key={item._id}
-                    className="flex items-center justify-between gap-3 border-b border-border/50 pb-1.5 text-[0.76rem] last:border-0"
-                  >
-                    <span className="min-w-0 flex-1 truncate">
-                      <span className="font-display">{book?.title}</span>
-                      <span className="text-muted-foreground"> · {book?.author}</span>
-                    </span>
-                    <span className="shrink-0 text-[0.6rem] tracking-[0.1em] text-muted-foreground uppercase">
-                      {item.priority}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <div className="paper-panel rounded-md p-3.5">
+                <div className="flex flex-wrap gap-2">
+                  {person.wishlist.slice(0, 10).map(({ item, book }) => (
+                    <Link
+                      key={item._id}
+                      to={book ? `/book/${book._id}` : "/wishlist"}
+                      className="w-14 shrink-0 transition hover:-translate-y-0.5"
+                      title={`${book?.title} · ${item.priority}`}
+                    >
+                      <BookCover
+                        title={book?.title ?? "Untitled"}
+                        author={book?.author}
+                        coverUrl={book?.coverUrl}
+                      />
+                    </Link>
+                  ))}
+                </div>
+                {person.wishlist.length > 10 ? (
+                  <p className="mt-2 text-[0.66rem] text-muted-foreground">
+                    +{person.wishlist.length - 10} more on the wishlist
+                  </p>
+                ) : null}
+              </div>
             ) : (
               <p className="text-[0.76rem] text-muted-foreground">
                 {person.privateActivity
