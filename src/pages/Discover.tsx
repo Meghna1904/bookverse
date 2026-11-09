@@ -3,7 +3,6 @@ import type { Id } from "@/lib/db-types";
 import {
   BookCover,
   PageHeader,
-  ReaderPicker,
   SectionHeading,
   Stars,
 } from "@/components/bookverse/primitives";
@@ -157,7 +156,6 @@ export default function Discover() {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [active, setActive] = useState<DiscoverBook | null>(null);
-  const [selectedReaders, setSelectedReaders] = useState<Id<"users">[]>([]);
   const [priority, setPriority] = useState<"someday" | "soon" | "next">("soon");
   const [busy, setBusy] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
@@ -165,10 +163,9 @@ export default function Discover() {
 
   useEffect(() => {
     if (active) {
-      setSelectedReaders(myUserId ? [myUserId] : []);
       setPriority("soon");
     }
-  }, [active, myUserId]);
+  }, [active]);
 
   useEffect(() => {
     const term = query.trim();
@@ -298,10 +295,11 @@ export default function Discover() {
       toast.error("This household has one reader so far. Invite your partner first.");
       return;
     }
-    const readerIds =
-      action === "together" ? readers.map((reader) => reader.userId) : selectedReaders;
+    const readerIds = action === "together"
+      ? readers.map((reader) => reader.userId)
+      : myUserId ? [myUserId] : [];
     if (!readerIds.length) {
-      toast.error("Choose at least one reader.");
+      toast.error("Choose your reader on the PIN login screen first.");
       return;
     }
     setBusy(true);
@@ -722,12 +720,6 @@ export default function Discover() {
                       "No description is available for this edition. You can add your own notes after saving it."}
                   </p>
                   <div className="mt-5 space-y-3">
-                    <Label className="label-caps">Who is reading?</Label>
-                    <ReaderPicker
-                      readers={readers}
-                      value={selectedReaders}
-                      onChange={setSelectedReaders}
-                    />
                     <div className="flex flex-wrap items-center gap-2 pt-1">
                       <Select
                         value={priority}
@@ -796,7 +788,6 @@ export default function Discover() {
       <ManualAddDialog
         open={manualOpen}
         onOpenChange={setManualOpen}
-        readers={readers}
         defaultReader={myUserId}
       />
     </div>
@@ -806,12 +797,10 @@ export default function Discover() {
 function ManualAddDialog({
   open,
   onOpenChange,
-  readers,
   defaultReader,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  readers: Array<{ userId: Id<"users">; displayName: string; isSample?: boolean }>;
   defaultReader?: Id<"users">;
 }) {
   const startReading = useMutation(api.books.startReading);
@@ -827,20 +816,15 @@ function ManualAddDialog({
     coverUrl: "",
     description: "",
   });
-  const [selected, setSelected] = useState<Id<"users">[]>([]);
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (open) setSelected(defaultReader ? [defaultReader] : []);
-  }, [open, defaultReader]);
 
   const submit = async (mode: "reading" | "wishlist") => {
     if (!form.title.trim()) {
       toast.error("A title is required.");
       return;
     }
-    if (!selected.length) {
-      toast.error("Choose at least one reader.");
+    if (!defaultReader) {
+      toast.error("Choose your reader on the PIN login screen first.");
       return;
     }
     setBusy(true);
@@ -856,14 +840,15 @@ function ManualAddDialog({
         coverUrl: form.coverUrl || undefined,
         description: form.description || undefined,
       };
+      const readerIds = [defaultReader];
       if (mode === "wishlist") {
-        await addWish({ book: payload, readerIds: selected, priority: "soon" });
+        await addWish({ book: payload, readerIds, priority: "soon" });
         toast.success("Added to the wishlist.");
       } else {
         await startReading({
           book: payload,
-          readerIds: selected,
-          mode: selected.length > 1 ? "together" : "individual",
+          readerIds,
+          mode: "individual",
         });
         toast.success("Added to Currently Reading.");
       }
@@ -1007,10 +992,6 @@ function ManualAddDialog({
               value={form.description}
               onChange={(event) => setForm({ ...form, description: event.target.value })}
             />
-          </div>
-          <div className="space-y-2 pt-1">
-            <Label className="label-caps">Readers</Label>
-            <ReaderPicker readers={readers} value={selected} onChange={setSelected} />
           </div>
         </div>
         <div className="mt-2 flex flex-wrap justify-end gap-2">
