@@ -411,6 +411,72 @@ export async function runMutation(name: string, args: any): Promise<any> {
       result = await update("profiles", readerId, { avatarUrl: data.publicUrl }); break;
     }
     case "books.setSpineColor": result = await update("books", args.bookId, { spineColor: args.color }); break;
+    case "books.updateDetails": {
+      const book = await one("books", args.bookId);
+      if (!book) throw new Error("Book not found.");
+      const details = args.details ?? {};
+      const title = String(details.title ?? "").trim();
+      const author = String(details.author ?? "").trim();
+      if (!title || !author) throw new Error("Title and author are required.");
+      const optionalText = (value: unknown) => String(value ?? "").trim() || null;
+      const positiveNumber = (value: unknown) => {
+        const number = Number(value);
+        return Number.isFinite(number) && number > 0 ? Math.round(number) : null;
+      };
+      result = await update("books", book.id, {
+        title,
+        author,
+        isbn: optionalText(details.isbn),
+        description: optionalText(details.description),
+        coverUrl: optionalText(details.coverUrl),
+        genre: optionalText(details.genre),
+        language: optionalText(details.language),
+        pageCount: positiveNumber(details.pageCount),
+        publisher: optionalText(details.publisher),
+        publishedYear: positiveNumber(details.publishedYear),
+        series: optionalText(details.series),
+        externalRef: optionalText(details.externalRef),
+        format: optionalText(details.format),
+        spineColor: optionalText(details.spineColor),
+      });
+      break;
+    }
+    case "books.updateRecord": {
+      const record = await one("readingRecords", args.recordId);
+      if (!record) throw new Error("Reading record not found.");
+      const book = await one("books", record.bookId);
+      const values = args.record ?? {};
+      const status = values.status === "completed" ? "completed" : "reading";
+      const mode = values.mode === "together" ? "together" : "individual";
+      const source = values.source === "digital" ? "digital" : "physical";
+      const startDate = Number(values.startDate);
+      const currentPage = Number(values.currentPage);
+      const completionDate = values.completionDate ? Number(values.completionDate) : null;
+      if (!Number.isFinite(startDate) || startDate <= 0) throw new Error("Enter a valid start date.");
+      if (!Number.isFinite(currentPage) || currentPage < 0) throw new Error("Page number must be zero or greater.");
+      if (book?.pageCount && currentPage > book.pageCount) throw new Error("Current page cannot exceed the book’s page count.");
+      if (completionDate !== null && (!Number.isFinite(completionDate) || completionDate <= 0)) {
+        throw new Error("Enter a valid completion date.");
+      }
+      if (status === "completed" && completionDate === null) throw new Error("Enter the date you finished reading.");
+      const rating = values.rating === "" || values.rating == null ? null : Number(values.rating);
+      if (rating !== null && (!Number.isFinite(rating) || rating < 1 || rating > 5)) {
+        throw new Error("Rating must be between one and five.");
+      }
+      result = await update("readingRecords", record.id, {
+        status,
+        mode,
+        source,
+        startDate: Math.round(startDate),
+        completionDate: status === "completed" ? completionDate : null,
+        currentPage: Math.round(currentPage),
+        rating,
+        review: String(values.review ?? "").trim() || null,
+        notes: String(values.notes ?? "").trim() || null,
+        updatedAt: timestamp,
+      });
+      break;
+    }
     case "books.startReading": {
       const book = await findOrCreateBook(args.book, true, Boolean(args.updateBookDetails));
       const readerIds = args.readerIds?.length ? args.readerIds : [readerId];

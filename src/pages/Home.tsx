@@ -1,5 +1,7 @@
 import { api } from "@/lib/data-api";
+import type { DbRow } from "@/lib/data-api";
 import type { Id } from "@/lib/db-types";
+import { BookEditDialog, EditBookButton } from "@/components/bookverse/BookEditDialog";
 import { HeroReadingScene } from "@/components/bookverse/HeroReadingScene";
 import {
   Avatar,
@@ -76,6 +78,7 @@ type ReadingCardModel = {
     onFinish?: () => void;
     onRemove: () => void;
   };
+  onEdit?: () => void;
 };
 
 function ReadingCard({ card }: { card: ReadingCardModel }) {
@@ -103,6 +106,7 @@ function ReadingCard({ card }: { card: ReadingCardModel }) {
             </p>
           </div>
           <div className="flex shrink-0 flex-col items-end gap-1">
+            {card.onEdit ? <EditBookButton title={card.title} onClick={card.onEdit} /> : null}
             {card.menu ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -207,6 +211,7 @@ export default function Home() {
   const data = useQuery(api.stats.home);
   const completeRecord = useMutation(api.books.completeRecord);
   const removeReading = useMutation(api.books.removeReading);
+  const [bookToEdit, setBookToEdit] = useState<DbRow | null>(null);
   const [progressTarget, setProgressTarget] = useState<{
     recordId: Id<"readingRecords">;
     bookId: Id<"books">;
@@ -282,6 +287,7 @@ export default function Home() {
               : (faces[0]?.name ?? "Reader"),
         readerFaces: faces,
         href: `/book/${entry.book._id}`,
+        onEdit: () => setBookToEdit(entry.book),
         menu: {
           ...(mine
             ? {
@@ -645,6 +651,12 @@ export default function Home() {
           <Heart className="size-4 fill-[#a75f3d]/20 text-[#a75f3d]" strokeWidth={1.6} />
         </p>
       </section>
+
+      <BookEditDialog
+        book={bookToEdit}
+        open={Boolean(bookToEdit)}
+        onOpenChange={(open) => !open && setBookToEdit(null)}
+      />
 
       {progressTarget ? (
         <ProgressDialog

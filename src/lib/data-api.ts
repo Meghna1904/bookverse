@@ -61,6 +61,8 @@ export const api = {
     memories: q<QueryResultMap["books.memories"]>("books.memories"),
     recentDiscoveries: q<QueryResultMap["books.recentDiscoveries"]>("books.recentDiscoveries"),
     bookDetail: q<QueryResultMap["books.bookDetail"]>("books.bookDetail"),
+    updateDetails: m("books.updateDetails"),
+    updateRecord: m("books.updateRecord"),
     startReading: m("books.startReading"),
     updateProgress: m("books.updateProgress"),
     completeRecord: m("books.completeRecord"),

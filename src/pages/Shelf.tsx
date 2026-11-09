@@ -233,26 +233,27 @@ function ReaderShelf({
                     const width = 92 + (hash % 9);
                     const height = 186 + (hash % 45);
                     return (
-                      <BookSpine
+                      <div
                         key={entry.book._id}
-                        title={entry.book.title}
-                        author={entry.book.author}
-                        spineColor={entry.book.spineColor}
-                        onClick={() =>
-                          paintMode
-                            ? onPaint(entry)
-                            : navigate(`/book/${entry.book._id}`)
-                        }
-                        className={cn(
-                          "justify-self-center hover:-translate-y-1.5 hover:brightness-105 focus-visible:-translate-y-1.5 focus-visible:brightness-110",
-                          paintMode &&
-                            "ring-2 ring-[#d8ba80]/80 ring-offset-1 ring-offset-[#4b3424]",
-                        )}
-                        style={{
-                          width: `${width}%`,
-                          height: `${height}px`,
-                        }}
-                      />
+                        className="group/spine relative justify-self-center"
+                        style={{ width: `${width}%`, height: `${height}px` }}
+                      >
+                        <BookSpine
+                          title={entry.book.title}
+                          author={entry.book.author}
+                          spineColor={entry.book.spineColor}
+                          onClick={() =>
+                            paintMode
+                              ? onPaint(entry)
+                              : navigate(`/book/${entry.book._id}`)
+                          }
+                          className={cn(
+                            "h-full w-full hover:-translate-y-1.5 hover:brightness-105 focus-visible:-translate-y-1.5 focus-visible:brightness-110",
+                            paintMode &&
+                              "ring-2 ring-[#d8ba80]/80 ring-offset-1 ring-offset-[#4b3424]",
+                          )}
+                        />
+                      </div>
                     );
                   }
                   if (slotIndex === row.length && row.length < PER_ROW) {

@@ -54,6 +54,27 @@ import { toast } from "sonner";
 
 type DiscoverBook = CatalogueBook & { rating?: number };
 
+function CoverUrlPreview({ url, title }: { url?: string | null; title: string }) {
+  const [failed, setFailed] = useState(!url);
+
+  useEffect(() => setFailed(!url), [url]);
+
+  return (
+    <div className="flex aspect-[2/3] w-full max-w-28 items-center justify-center overflow-hidden rounded-md border border-border/70 bg-secondary/50 p-2 text-center text-[0.65rem] text-muted-foreground">
+      {url && !failed ? (
+        <img
+          src={url}
+          alt={`Cover preview for ${title || "book"}`}
+          className="h-full w-full object-cover"
+          onError={() => setFailed(true)}
+        />
+      ) : (
+        <span>Cover preview appears here</span>
+      )}
+    </div>
+  );
+}
+
 type Filters = {
   genre: string;
   language: string;
@@ -764,27 +785,30 @@ export default function Discover() {
                         <Label htmlFor="discover-author" className="label-caps">Author</Label>
                         <Input id="discover-author" value={draft.author} onChange={(event) => updateDraftText("author", event.target.value)} />
                       </div>
-                      <div className="space-y-1.5 sm:col-span-2">
-                        <Label htmlFor="discover-cover" className="label-caps">Cover image URL</Label>
-                        <Input
-                          id="discover-cover"
-                          type="url"
-                          value={draft.coverUrl ?? ""}
-                          onChange={(event) => updateDraftText("coverUrl", event.target.value)}
-                          placeholder="Paste a Google Books image URL"
-                        />
-                        {active.coverUrl ? (
-                          <Button
-                            type="button"
-                            variant="link"
-                            size="sm"
-                            className="h-auto p-0 text-xs"
-                            onClick={() => updateDraftText("coverUrl", active.coverUrl ?? "")}
-                          >
-                            Use catalogue cover
-                          </Button>
-                        ) : null}
-                        <p className="text-[0.65rem] text-muted-foreground">Leave the original link as-is, or paste a direct image URL to use another cover.</p>
+                      <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-3 sm:col-span-2 sm:grid-cols-[7rem_minmax(0,1fr)]">
+                        <CoverUrlPreview url={draft.coverUrl} title={draft.title} />
+                        <div className="space-y-1.5">
+                          <Label htmlFor="discover-cover" className="label-caps">Cover image URL</Label>
+                          <Input
+                            id="discover-cover"
+                            type="url"
+                            value={draft.coverUrl ?? ""}
+                            onChange={(event) => updateDraftText("coverUrl", event.target.value)}
+                            placeholder="Paste a Google Books image URL"
+                          />
+                          {active.coverUrl ? (
+                            <Button
+                              type="button"
+                              variant="link"
+                              size="sm"
+                              className="h-auto p-0 text-xs"
+                              onClick={() => updateDraftText("coverUrl", active.coverUrl ?? "")}
+                            >
+                              Use catalogue cover
+                            </Button>
+                          ) : null}
+                          <p className="text-[0.65rem] text-muted-foreground">Leave the original link as-is, or paste a direct image URL to use another cover.</p>
+                        </div>
                       </div>
                       <div className="space-y-1.5">
                         <Label htmlFor="discover-isbn" className="label-caps">ISBN</Label>
@@ -911,6 +935,7 @@ function ManualAddDialog({
   defaultReader?: Id<"users">;
 }) {
   const startReading = useMutation(api.books.startReading);
+  const markAsRead = useMutation(api.books.markAsRead);
   const addWish = useMutation(api.wishlist.add);
   const [form, setForm] = useState({
     title: "",
@@ -924,8 +949,109 @@ function ManualAddDialog({
     description: "",
   });
   const [busy, setBusy] = useState(false);
+  const [suggestions, setSuggestions] = useState<DiscoverBook[]>([]);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestionChecked, setSuggestionChecked] = useState(false);
+  const [selectedSuggestionTitle, setSelectedSuggestionTitle] = useState("");
 
-  const submit = async (mode: "reading" | "wishlist") => {
+  useEffect(() => {
+    const title = form.title.trim();
+    if (!open || title.length < 2 || title.toLowerCase() === selectedSuggestionTitle) {
+      setSuggestions([]);
+      setSuggesting(false);
+      setSuggestionChecked(false);
+      return;
+    }
+
+    setSuggestions([]);
+    setSuggestionChecked(false);
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setSuggesting(true);
+      try {
+        let matches: DiscoverBook[] = [];
+        try {
+          const response = await fetch(
+            `https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(title)}&maxResults=5&printType=books`,
+            { signal: controller.signal },
+          );
+          if (!response.ok) throw new Error("Google Books search failed");
+          const result = (await response.json()) as { items?: GoogleVolume[] };
+          matches = (result.items ?? []).map(fromGoogleVolume);
+        } catch {
+          if (controller.signal.aborted) return;
+        }
+
+        if (!matches.length && !controller.signal.aborted) {
+          const response = await fetch(
+            `https://openlibrary.org/search.json?q=${encodeURIComponent(title)}&limit=5&fields=key,title,author_name,first_publish_year,cover_i,number_of_pages_median,isbn,subject,publisher`,
+            { signal: controller.signal },
+          );
+          if (!response.ok) throw new Error("Open Library search failed");
+          const result = (await response.json()) as {
+            docs?: Array<{
+              key: string;
+              title?: string;
+              author_name?: string[];
+              first_publish_year?: number;
+              cover_i?: number;
+              number_of_pages_median?: number;
+              isbn?: string[];
+              subject?: string[];
+              publisher?: string[];
+            }>;
+          };
+          matches = (result.docs ?? []).map((book) => ({
+            title: book.title ?? "Untitled",
+            author: book.author_name?.join(", ") ?? "Unknown author",
+            isbn: book.isbn?.[0],
+            coverUrl: book.cover_i
+              ? `https://covers.openlibrary.org/b/id/${book.cover_i}-L.jpg`
+              : undefined,
+            genre: book.subject?.[0],
+            pageCount: book.number_of_pages_median,
+            publishedYear: book.first_publish_year,
+            publisher: book.publisher?.[0],
+            externalRef: `openlibrary:${book.key}`,
+          }));
+        }
+        if (!controller.signal.aborted) setSuggestions(matches);
+      } catch {
+        if (!controller.signal.aborted) setSuggestions([]);
+      } finally {
+        if (!controller.signal.aborted) {
+          setSuggesting(false);
+          setSuggestionChecked(true);
+        }
+      }
+    }, 300);
+
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [open, form.title, selectedSuggestionTitle]);
+
+  const useSuggestion = (book: DiscoverBook) => {
+    setSelectedSuggestionTitle(book.title.trim().toLowerCase());
+    setForm((current) => ({
+      ...current,
+      title: book.title,
+      author: book.author,
+      isbn: book.isbn ?? current.isbn,
+      genre: GENRES.find((genre) => genre.toLowerCase() === book.genre?.toLowerCase())
+        ?? current.genre,
+      language: LANGUAGES.find((language) => language.toLowerCase() === book.language?.toLowerCase())
+        ?? current.language,
+      pageCount: book.pageCount ? String(book.pageCount) : current.pageCount,
+      publishedYear: book.publishedYear ? String(book.publishedYear) : current.publishedYear,
+      coverUrl: book.coverUrl ?? current.coverUrl,
+      description: book.description ?? current.description,
+    }));
+    setSuggestions([]);
+  };
+
+  const submit = async (mode: "reading" | "wishlist" | "read") => {
     if (!form.title.trim()) {
       toast.error("A title is required.");
       return;
@@ -951,6 +1077,9 @@ function ManualAddDialog({
       if (mode === "wishlist") {
         await addWish({ book: payload, readerIds, priority: "soon", updateBookDetails: true });
         toast.success("Added to the wishlist.");
+      } else if (mode === "read") {
+        await markAsRead({ book: payload, readerIds, updateBookDetails: true });
+        toast.success("Marked as read and added to your shelf.");
       } else {
         await startReading({
           book: payload,
@@ -990,16 +1119,69 @@ function ManualAddDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-3 py-1">
-          <div className="space-y-1.5">
+          <div className="relative space-y-1.5">
             <Label htmlFor="manual-title" className="label-caps">
               Title
             </Label>
             <Input
               id="manual-title"
               value={form.title}
-              onChange={(event) => setForm({ ...form, title: event.target.value })}
+              onChange={(event) => {
+                setSelectedSuggestionTitle("");
+                setForm({ ...form, title: event.target.value });
+              }}
+              autoComplete="off"
+              aria-autocomplete="list"
+              aria-controls="manual-book-suggestions"
               placeholder="The book's title"
             />
+            {form.title.trim().length >= 2 &&
+            (suggesting || suggestions.length > 0 || suggestionChecked) ? (
+              <div
+                id="manual-book-suggestions"
+                role="listbox"
+                aria-label="Catalogue suggestions"
+                className="absolute inset-x-0 top-full z-30 mt-1 max-h-64 overflow-y-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground"
+              >
+                {suggesting && !suggestions.length ? (
+                  <p className="px-3 py-2 text-xs text-muted-foreground">Looking for matching books…</p>
+                ) : null}
+                {suggestionChecked && !suggesting && !suggestions.length ? (
+                  <p className="px-3 py-2 text-xs text-muted-foreground">
+                    No catalogue matches found. You can keep entering the book details manually.
+                  </p>
+                ) : null}
+                {suggestions.map((book, index) => (
+                  <button
+                    key={`${book.isbn ?? book.title}-${index}`}
+                    type="button"
+                    role="option"
+                    aria-selected={false}
+                    onClick={() => useSuggestion(book)}
+                    className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-secondary"
+                  >
+                    <BookCover
+                      title={book.title}
+                      author={book.author}
+                      coverUrl={book.coverUrl}
+                      className="w-9 shrink-0"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium">{book.title}</span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {book.author}{book.publishedYear ? ` · ${book.publishedYear}` : ""}
+                      </span>
+                    </span>
+                    {book.pageCount ? (
+                      <span className="shrink-0 text-[0.65rem] text-muted-foreground">{book.pageCount} pp</span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+            <p className="text-[0.65rem] text-muted-foreground">
+              Suggestions are optional. You can keep typing your own details.
+            </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
@@ -1079,16 +1261,20 @@ function ManualAddDialog({
               </Select>
             </div>
           </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="manual-cover" className="label-caps">
-              Cover image URL
-            </Label>
-            <Input
-              id="manual-cover"
-              value={form.coverUrl}
-              onChange={(event) => setForm({ ...form, coverUrl: event.target.value })}
-              placeholder="https://… (optional)"
-            />
+          <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-3 sm:grid-cols-[7rem_minmax(0,1fr)]">
+            <CoverUrlPreview url={form.coverUrl} title={form.title} />
+            <div className="space-y-1.5">
+              <Label htmlFor="manual-cover" className="label-caps">
+                Cover image URL
+              </Label>
+              <Input
+                id="manual-cover"
+                type="url"
+                value={form.coverUrl}
+                onChange={(event) => setForm({ ...form, coverUrl: event.target.value })}
+                placeholder="https://… (optional)"
+              />
+            </div>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="manual-description" className="label-caps">
@@ -1108,6 +1294,9 @@ function ManualAddDialog({
           </Button>
           <Button variant="outline" disabled={busy} onClick={() => submit("wishlist")}>
             <Bookmark className="mr-2 size-4" /> Wishlist
+          </Button>
+          <Button variant="outline" disabled={busy} onClick={() => submit("read")}>
+            <CheckCheck className="mr-2 size-4" /> Mark as read
           </Button>
           <Button
             className="rounded-full bg-forest text-primary-foreground hover:bg-forest/90"

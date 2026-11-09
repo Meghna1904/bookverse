@@ -11,6 +11,16 @@ import {
   ReviewDialog,
 } from "@/components/bookverse/dialogs";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { errorMessage, formatDate, formatDayKey, formatMinutes } from "@/lib/bookverse";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery } from "@/lib/data-hooks";
@@ -27,6 +37,31 @@ import { useState } from "react";
 import { Link, useParams } from "react-router";
 import { toast } from "sonner";
 
+function toDateInput(value?: number | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function fromDateInput(value: string) {
+  return value ? new Date(`${value}T12:00:00`).getTime() : null;
+}
+
+type BookEditDraft = Record<string, string>;
+type RecordEditDraft = {
+  status: string;
+  mode: string;
+  source: string;
+  startDate: string;
+  completionDate: string;
+  currentPage: string;
+  rating: string;
+  review: string;
+  notes: string;
+};
+
 export default function BookDetail() {
   const { bookId } = useParams<{ bookId: string }>();
   const data = useQuery(
@@ -34,11 +69,19 @@ export default function BookDetail() {
     bookId ? { bookId: bookId as Id<"books"> } : "skip",
   );
   const startReading = useMutation(api.books.startReading);
+  const updateBookDetails = useMutation(api.books.updateDetails);
+  const updateReadingRecord = useMutation(api.books.updateRecord);
   const completeRecord = useMutation(api.books.completeRecord);
   const [progressOpen, setProgressOpen] = useState(false);
   const [finishOpen, setFinishOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [starting, setStarting] = useState(false);
+  const [bookEditOpen, setBookEditOpen] = useState(false);
+  const [bookDraft, setBookDraft] = useState<BookEditDraft | null>(null);
+  const [recordEditOpen, setRecordEditOpen] = useState(false);
+  const [recordDraft, setRecordDraft] = useState<RecordEditDraft | null>(null);
+  const [editingRecordId, setEditingRecordId] = useState<string | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   if (data === undefined) {
     return <div className="h-96 animate-pulse rounded-lg bg-secondary/60" />;
@@ -95,6 +138,81 @@ export default function BookDetail() {
       toast.error(errorMessage(error));
     } finally {
       setStarting(false);
+    }
+  };
+
+  const openBookEditor = () => {
+    setBookDraft({
+      title: book.title ?? "",
+      author: book.author ?? "",
+      isbn: book.isbn ?? "",
+      description: book.description ?? "",
+      coverUrl: book.coverUrl ?? "",
+      genre: book.genre ?? "",
+      language: book.language ?? "",
+      pageCount: book.pageCount == null ? "" : String(book.pageCount),
+      publisher: book.publisher ?? "",
+      publishedYear: book.publishedYear == null ? "" : String(book.publishedYear),
+      series: book.series ?? "",
+      externalRef: book.externalRef ?? "",
+      format: book.format ?? "",
+      spineColor: book.spineColor ?? "",
+    });
+    setBookEditOpen(true);
+  };
+
+  const openRecordEditor = (record: (typeof records)[number]) => {
+    setEditingRecordId(record._id);
+    setRecordDraft({
+      status: record.status ?? "reading",
+      mode: record.mode ?? "individual",
+      source: record.source ?? "physical",
+      startDate: toDateInput(record.startDate),
+      completionDate: toDateInput(record.completionDate),
+      currentPage: String(record.currentPage ?? 0),
+      rating: record.rating == null ? "" : String(record.rating),
+      review: record.review ?? "",
+      notes: record.notes ?? "",
+    });
+    setRecordEditOpen(true);
+  };
+
+  const saveBookDetails = async () => {
+    if (!bookDraft) return;
+    setSavingEdit(true);
+    try {
+      await updateBookDetails({ bookId: book._id, details: bookDraft });
+      toast.success("Book details updated.");
+      setBookEditOpen(false);
+    } catch (error) {
+      toast.error(errorMessage(error));
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const saveRecordDetails = async () => {
+    if (!recordDraft || !editingRecordId) return;
+    if (recordDraft.status === "completed" && !recordDraft.completionDate) {
+      toast.error("Choose the date you finished reading.");
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      await updateReadingRecord({
+        recordId: editingRecordId,
+        record: {
+          ...recordDraft,
+          startDate: fromDateInput(recordDraft.startDate),
+          completionDate: fromDateInput(recordDraft.completionDate),
+        },
+      });
+      toast.success("Reading record updated.");
+      setRecordEditOpen(false);
+    } catch (error) {
+      toast.error(errorMessage(error));
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -186,6 +304,15 @@ export default function BookDetail() {
           <p className="font-display-italic mt-1 text-lg text-muted-foreground">
             {book.author}
           </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="mt-4 rounded-full"
+            onClick={openBookEditor}
+          >
+            <PenLine className="mr-2 size-3.5" /> Edit book details
+          </Button>
           {book.description ? (
             <p className="mt-5 max-w-2xl text-[0.88rem] leading-relaxed text-muted-foreground">
               {book.description}
@@ -332,8 +459,16 @@ export default function BookDetail() {
                     </p>
                   ) : null}
 
-                  {record.readerId === myUserId && record.status === "completed" ? (
-                    <div className="mt-4 flex justify-end">
+                  <div className="mt-4 flex flex-wrap justify-end gap-2">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-[0.7rem]"
+                      onClick={() => openRecordEditor(record)}
+                    >
+                      <PenLine className="mr-1.5 size-3.5" /> Edit reading record
+                    </Button>
+                    {record.readerId === myUserId && record.status === "completed" ? (
                       <Button
                         size="sm"
                         variant="ghost"
@@ -342,8 +477,8 @@ export default function BookDetail() {
                       >
                         <PenLine className="mr-1.5 size-3.5" /> Edit review
                       </Button>
-                    </div>
-                  ) : null}
+                    ) : null}
+                  </div>
                 </article>
               ))}
               {records.length === 0 ? (
@@ -387,6 +522,174 @@ export default function BookDetail() {
           ) : null}
         </div>
       </div>
+
+      <Dialog open={bookEditOpen} onOpenChange={setBookEditOpen}>
+        <DialogContent className="max-h-[92vh] overflow-y-auto bg-card sm:max-w-2xl">
+          <DialogHeader>
+            <p className="label-caps">Book details</p>
+            <DialogTitle className="font-display text-2xl">Edit this book</DialogTitle>
+            <DialogDescription>
+              Update the shared book information shown across your shelves.
+            </DialogDescription>
+          </DialogHeader>
+          {bookDraft ? (
+            <div className="space-y-4 py-1">
+              <div className="grid grid-cols-[5rem_minmax(0,1fr)] items-start gap-3 sm:grid-cols-[7rem_minmax(0,1fr)]">
+                <BookCover
+                  title={bookDraft.title || "Book cover"}
+                  author={bookDraft.author}
+                  coverUrl={bookDraft.coverUrl}
+                  className="max-w-28"
+                />
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="book-edit-cover">Cover image URL</Label>
+                    <Input
+                      id="book-edit-cover"
+                      type="url"
+                      value={bookDraft.coverUrl}
+                      onChange={(event) => setBookDraft({ ...bookDraft, coverUrl: event.target.value })}
+                      placeholder="https://…"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">The preview updates when you paste a valid image link.</p>
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="book-edit-title">Title</Label>
+                  <Input id="book-edit-title" value={bookDraft.title} onChange={(event) => setBookDraft({ ...bookDraft, title: event.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="book-edit-author">Author</Label>
+                  <Input id="book-edit-author" value={bookDraft.author} onChange={(event) => setBookDraft({ ...bookDraft, author: event.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="book-edit-isbn">ISBN</Label>
+                  <Input id="book-edit-isbn" value={bookDraft.isbn} onChange={(event) => setBookDraft({ ...bookDraft, isbn: event.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="book-edit-genre">Genre</Label>
+                  <Input id="book-edit-genre" value={bookDraft.genre} onChange={(event) => setBookDraft({ ...bookDraft, genre: event.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="book-edit-language">Language</Label>
+                  <Input id="book-edit-language" value={bookDraft.language} onChange={(event) => setBookDraft({ ...bookDraft, language: event.target.value })} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="book-edit-pages">Pages</Label>
+                    <Input id="book-edit-pages" type="number" min={1} value={bookDraft.pageCount} onChange={(event) => setBookDraft({ ...bookDraft, pageCount: event.target.value })} />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="book-edit-year">Published year</Label>
+                    <Input id="book-edit-year" type="number" min={1} value={bookDraft.publishedYear} onChange={(event) => setBookDraft({ ...bookDraft, publishedYear: event.target.value })} />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="book-edit-publisher">Publisher</Label>
+                  <Input id="book-edit-publisher" value={bookDraft.publisher} onChange={(event) => setBookDraft({ ...bookDraft, publisher: event.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="book-edit-series">Series</Label>
+                  <Input id="book-edit-series" value={bookDraft.series} onChange={(event) => setBookDraft({ ...bookDraft, series: event.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="book-edit-format">Format</Label>
+                  <Input id="book-edit-format" value={bookDraft.format} onChange={(event) => setBookDraft({ ...bookDraft, format: event.target.value })} placeholder="Paperback, ebook, audiobook…" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="book-edit-spine">Spine color</Label>
+                  <Input id="book-edit-spine" value={bookDraft.spineColor} onChange={(event) => setBookDraft({ ...bookDraft, spineColor: event.target.value })} placeholder="#6b754b" />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="book-edit-description">Description</Label>
+                  <Textarea id="book-edit-description" rows={4} value={bookDraft.description} onChange={(event) => setBookDraft({ ...bookDraft, description: event.target.value })} />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="book-edit-external">Catalogue reference</Label>
+                  <Input id="book-edit-external" value={bookDraft.externalRef} onChange={(event) => setBookDraft({ ...bookDraft, externalRef: event.target.value })} />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="ghost" onClick={() => setBookEditOpen(false)}>Cancel</Button>
+                <Button type="button" disabled={savingEdit} onClick={saveBookDetails} className="rounded-full bg-forest text-primary-foreground hover:bg-forest/90">
+                  {savingEdit ? <Loader2 className="mr-2 size-4 animate-spin" /> : null} Save book details
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={recordEditOpen} onOpenChange={setRecordEditOpen}>
+        <DialogContent className="max-h-[92vh] overflow-y-auto bg-card sm:max-w-lg">
+          <DialogHeader>
+            <p className="label-caps">Reading record</p>
+            <DialogTitle className="font-display text-2xl">Edit reading details</DialogTitle>
+            <DialogDescription>
+              Change the reader’s progress, dates, status, rating and notes.
+            </DialogDescription>
+          </DialogHeader>
+          {recordDraft ? (
+            <div className="space-y-4 py-1">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label htmlFor="record-edit-status">Status</Label>
+                  <select id="record-edit-status" className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm" value={recordDraft.status} onChange={(event) => setRecordDraft({ ...recordDraft, status: event.target.value })}>
+                    <option value="reading">Currently reading</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="record-edit-mode">Reading together</Label>
+                  <select id="record-edit-mode" className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm" value={recordDraft.mode} onChange={(event) => setRecordDraft({ ...recordDraft, mode: event.target.value })}>
+                    <option value="individual">Individual</option>
+                    <option value="together">Together</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="record-edit-source">Copy type</Label>
+                  <select id="record-edit-source" className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm" value={recordDraft.source} onChange={(event) => setRecordDraft({ ...recordDraft, source: event.target.value })}>
+                    <option value="physical">Physical copy</option>
+                    <option value="digital">Digital copy</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="record-edit-page">Current page</Label>
+                  <Input id="record-edit-page" type="number" min={0} max={book.pageCount ?? undefined} value={recordDraft.currentPage} onChange={(event) => setRecordDraft({ ...recordDraft, currentPage: event.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="record-edit-start">Started reading</Label>
+                  <Input id="record-edit-start" type="date" value={recordDraft.startDate} onChange={(event) => setRecordDraft({ ...recordDraft, startDate: event.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="record-edit-finish">Finished reading</Label>
+                  <Input id="record-edit-finish" type="date" value={recordDraft.completionDate} onChange={(event) => setRecordDraft({ ...recordDraft, completionDate: event.target.value })} disabled={recordDraft.status !== "completed"} />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="record-edit-rating">Rating (1–5)</Label>
+                  <Input id="record-edit-rating" type="number" min={1} max={5} step={1} value={recordDraft.rating} onChange={(event) => setRecordDraft({ ...recordDraft, rating: event.target.value })} placeholder="Optional" />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="record-edit-review">Review</Label>
+                  <Textarea id="record-edit-review" rows={3} value={recordDraft.review} onChange={(event) => setRecordDraft({ ...recordDraft, review: event.target.value })} />
+                </div>
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label htmlFor="record-edit-notes">Private notes</Label>
+                  <Textarea id="record-edit-notes" rows={3} value={recordDraft.notes} onChange={(event) => setRecordDraft({ ...recordDraft, notes: event.target.value })} />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="ghost" onClick={() => setRecordEditOpen(false)}>Cancel</Button>
+                <Button type="button" disabled={savingEdit} onClick={saveRecordDetails} className="rounded-full bg-forest text-primary-foreground hover:bg-forest/90">
+                  {savingEdit ? <Loader2 className="mr-2 size-4 animate-spin" /> : null} Save reading record
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
 
       {myRecord ? (
         <ProgressDialog

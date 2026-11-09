@@ -1,5 +1,7 @@
 import { api } from "@/lib/data-api";
+import type { DbRow } from "@/lib/data-api";
 import type { Id } from "@/lib/db-types";
+import { BookEditDialog, EditBookButton } from "@/components/bookverse/BookEditDialog";
 import {
   BookCover,
   EmptyState,
@@ -60,7 +62,7 @@ type WishlistEntry = {
     note?: string;
     addedAt: number;
   };
-  book: {
+  book: DbRow & {
     _id: Id<"books">;
     title: string;
     author: string;
@@ -84,6 +86,7 @@ export default function Wishlist() {
   const [languageFilter, setLanguageFilter] = useState("all");
   const [sort, setSort] = useState("recent");
   const [active, setActive] = useState<WishlistEntry | null>(null);
+  const [bookToEdit, setBookToEdit] = useState<DbRow | null>(null);
 
   const items = (data?.items ?? []) as WishlistEntry[];
   const readers = data?.readers ?? [];
@@ -278,12 +281,15 @@ export default function Wishlist() {
                 className="paper-card paper-card flex cursor-pointer gap-4 rounded-lg p-4 transition hover:border-olive/40"
                 onClick={() => setActive(primary)}
               >
-                <div className="w-[82px] shrink-0">
+                <div className="relative w-[82px] shrink-0">
                   <BookCover
                     title={group.book.title}
                     author={group.book.author}
                     coverUrl={group.book.coverUrl}
                   />
+                  <div className="absolute top-1 right-1 z-10 rounded-full bg-card/90 shadow-sm">
+                    <EditBookButton title={group.book.title} onClick={() => setBookToEdit(group.book)} />
+                  </div>
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1">
@@ -379,6 +385,12 @@ export default function Wishlist() {
           }}
         />
       ) : null}
+
+      <BookEditDialog
+        book={bookToEdit}
+        open={Boolean(bookToEdit)}
+        onOpenChange={(open) => !open && setBookToEdit(null)}
+      />
     </div>
   );
 }
