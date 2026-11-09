@@ -222,6 +222,7 @@ html.dark {
     font-family: "Cormorant Garamond", "Iowan Old Style", Georgia, "Times New Roman", serif;
     font-weight: 500;
     letter-spacing: -0.012em;
+    font-variant-numeric: lining-nums tabular-nums;
   }
   .font-display-italic {
     font-family: "Cormorant Garamond", Georgia, serif;
