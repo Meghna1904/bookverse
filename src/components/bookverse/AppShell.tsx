@@ -209,7 +209,7 @@ export function AppShell() {
 
         <div className="border-t border-border/70 xl:hidden">
           <nav className="no-scrollbar page-shell flex gap-1 overflow-x-auto py-2">
-            {NAV.map((item) => {
+            {NAV.filter((item) => !item.iconOnly).map((item) => {
               const Icon = item.icon;
               return (
                 <NavLink
