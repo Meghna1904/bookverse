@@ -13,12 +13,21 @@ import {
 } from "@/components/bookverse/dialogs";
 import { Button } from "@/components/ui/button";
 import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { timeAgo } from "@/lib/bookverse";
+import { errorMessage, timeAgo } from "@/lib/bookverse";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery } from "@/lib/data-hooks";
 import {
@@ -33,10 +42,12 @@ import {
   Play,
   Search,
   Sparkles,
+  Trash2,
   Trophy,
 } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
+import { toast } from "sonner";
 
 const ACTIVITY_VERB: Record<string, string> = {
   started: "started",
@@ -61,8 +72,9 @@ type ReadingCardModel = {
   readerFaces: Array<{ name: string; src?: string | null }>;
   href: string;
   menu?: {
-    onProgress: () => void;
-    onFinish: () => void;
+    onProgress?: () => void;
+    onFinish?: () => void;
+    onRemove: () => void;
   };
 };
 
@@ -103,11 +115,22 @@ function ReadingCard({ card }: { card: ReadingCardModel }) {
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={card.menu.onProgress}>
-                    Update progress
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onSelect={card.menu.onFinish}>
-                    Mark finished
+                  {card.menu.onProgress ? (
+                    <DropdownMenuItem onSelect={card.menu.onProgress}>
+                      Update progress
+                    </DropdownMenuItem>
+                  ) : null}
+                  {card.menu.onFinish ? (
+                    <DropdownMenuItem onSelect={card.menu.onFinish}>
+                      Mark finished
+                    </DropdownMenuItem>
+                  ) : null}
+                  <DropdownMenuItem
+                    onSelect={card.menu.onRemove}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="mr-2 size-3.5" />
+                    Remove from Currently Reading
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -183,6 +206,7 @@ function ReadingCard({ card }: { card: ReadingCardModel }) {
 export default function Home() {
   const data = useQuery(api.stats.home);
   const completeRecord = useMutation(api.books.completeRecord);
+  const removeReading = useMutation(api.books.removeReading);
   const [progressTarget, setProgressTarget] = useState<{
     recordId: Id<"readingRecords">;
     bookId: Id<"books">;
@@ -196,6 +220,12 @@ export default function Home() {
   } | null>(null);
   const [checkInOpen, setCheckInOpen] = useState(false);
   const [showAllReading, setShowAllReading] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<{
+    bookId: Id<"books">;
+    title: string;
+    readerNames: string[];
+  } | null>(null);
+  const [removingReading, setRemovingReading] = useState(false);
 
   if (!data) {
     return (
@@ -252,8 +282,9 @@ export default function Home() {
               : (faces[0]?.name ?? "Reader"),
         readerFaces: faces,
         href: `/book/${entry.book._id}`,
-        menu: mine
-          ? {
+        menu: {
+          ...(mine
+            ? {
               onProgress: () =>
                 setProgressTarget({
                   recordId: mine.record._id,
@@ -267,8 +298,15 @@ export default function Home() {
                   recordId: mine.record._id,
                   title: entry.book.title,
                 }),
-            }
-          : undefined,
+              }
+            : {}),
+          onRemove: () =>
+            setRemoveTarget({
+              bookId: entry.book._id,
+              title: entry.book.title,
+              readerNames: entry.records.map((record) => record.readerName),
+            }),
+        },
       };
     }),
     ...data.digital.map((entry) => ({
@@ -309,6 +347,24 @@ export default function Home() {
       label: "Shared Books",
     },
   ];
+
+  const confirmRemoveReading = async () => {
+    if (!removeTarget) return;
+    setRemovingReading(true);
+    try {
+      const removedCount = await removeReading({ bookId: removeTarget.bookId });
+      if (!removedCount) {
+        toast.error("This book is no longer in Currently Reading.");
+      } else {
+        toast.success("Removed from Currently Reading.");
+      }
+      setRemoveTarget(null);
+    } catch (error) {
+      toast.error(errorMessage(error));
+    } finally {
+      setRemovingReading(false);
+    }
+  };
 
   return (
     <div className="space-y-8 pb-6">
@@ -614,6 +670,35 @@ export default function Home() {
           await completeRecord({ recordId: finishTarget.recordId, ...input });
         }}
       />
+
+      <AlertDialog
+        open={Boolean(removeTarget)}
+        onOpenChange={(open) => {
+          if (!open && !removingReading) setRemoveTarget(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove from Currently Reading?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the active reading progress for <strong>{removeTarget?.title}</strong>
+              {removeTarget?.readerNames.length
+                ? ` (${removeTarget.readerNames.join(" and ")})`
+                : ""}. The book and any PDF in your Library will stay.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removingReading}>Cancel</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={removingReading}
+              onClick={() => void confirmRemoveReading()}
+            >
+              {removingReading ? "Removing…" : "Remove progress"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <CheckInDialog
         open={checkInOpen}

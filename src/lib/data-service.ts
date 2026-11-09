@@ -419,6 +419,14 @@ export async function runMutation(name: string, args: any): Promise<any> {
       result = await update("readingRecords", record.id, { status: "completed", completionDate: args.completionDate ?? timestamp, currentPage: book?.pageCount ?? record.currentPage, rating: args.rating, review: args.review ?? null, notes: args.notes ?? null, updatedAt: timestamp });
       await logActivity("finished", book?.title ?? "A book", "Finished reading", record.bookId); break;
     }
+    case "books.removeReading": {
+      const activeRecords = (await records()).filter(
+        (record) => record.bookId === args.bookId && record.status === "reading",
+      );
+      await Promise.all(activeRecords.map((record) => remove("readingRecords", record.id)));
+      result = activeRecords.length;
+      break;
+    }
     case "books.markAsRead": {
       const book = await findOrCreateBook(args.book, true);
       const readerIds = args.readerIds?.length ? args.readerIds : [readerId];

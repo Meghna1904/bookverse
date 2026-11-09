@@ -64,6 +64,7 @@ export const api = {
     startReading: m("books.startReading"),
     updateProgress: m("books.updateProgress"),
     completeRecord: m("books.completeRecord"),
+    removeReading: m("books.removeReading"),
     markAsRead: m("books.markAsRead"),
     saveReview: m("books.saveReview"),
     setSpineColor: m("books.setSpineColor"),
