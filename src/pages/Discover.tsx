@@ -156,6 +156,8 @@ export default function Discover() {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [active, setActive] = useState<DiscoverBook | null>(null);
+  const [draft, setDraft] = useState<DiscoverBook | null>(null);
+  const [editingDetails, setEditingDetails] = useState(false);
   const [priority, setPriority] = useState<"someday" | "soon" | "next">("soon");
   const [busy, setBusy] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
@@ -165,7 +167,16 @@ export default function Discover() {
     if (active) {
       setPriority("soon");
     }
+    setDraft(active ? { ...active } : null);
+    setEditingDetails(false);
   }, [active]);
+
+  const updateDraftText = (
+    field: Exclude<keyof CatalogueBook, "pageCount" | "publishedYear">,
+    value: string,
+  ) => setDraft((current) => current ? { ...current, [field]: value } : current);
+  const updateDraftNumber = (field: "pageCount" | "publishedYear", value: string) =>
+    setDraft((current) => current ? { ...current, [field]: value ? Number(value) : undefined } : current);
 
   useEffect(() => {
     const term = query.trim();
@@ -264,6 +275,8 @@ export default function Discover() {
     return merged;
   }, [localResults, remote, filters]);
 
+  const bookInDialog = draft ?? active;
+
   const sections = useMemo(() => {
     const curated = CURATED_BOOKS.filter((book) => matches(book, filters));
     const byIsbn = (isbn: string) => curated.find((book) => book.isbn === isbn);
@@ -302,19 +315,30 @@ export default function Discover() {
       toast.error("Choose your reader on the PIN login screen first.");
       return;
     }
+    const bookDetails = draft ?? active;
+    if (!bookDetails.title.trim()) {
+      toast.error("Add a title before saving this book.");
+      return;
+    }
+    const payload = bookPayload({
+      ...bookDetails,
+      title: bookDetails.title.trim(),
+      author: bookDetails.author.trim() || "Unknown author",
+    });
     setBusy(true);
     try {
       if (action === "wishlist") {
-        await addWish({ book: bookPayload(active), readerIds, priority });
+        await addWish({ book: payload, readerIds, priority, updateBookDetails: true });
         toast.success("Saved to the wishlist.");
       } else if (action === "read") {
-        await markAsRead({ book: bookPayload(active), readerIds });
+        await markAsRead({ book: payload, readerIds, updateBookDetails: true });
         toast.success("Marked as read and added to your shelf.");
       } else {
         await startReading({
-          book: bookPayload(active),
+          book: payload,
           readerIds,
           mode: readerIds.length > 1 ? "together" : "individual",
+          updateBookDetails: true,
         });
         toast.success(
           readerIds.length > 1
@@ -682,30 +706,30 @@ export default function Discover() {
           {active ? (
             <>
               <DialogHeader>
-                <p className="label-caps">{active.genre ?? "Catalogue edition"}</p>
+                <p className="label-caps">{bookInDialog?.genre ?? "Catalogue edition"}</p>
                 <DialogTitle className="font-display text-2xl leading-tight">
-                  {active.title}
+                  {bookInDialog?.title ?? active.title}
                 </DialogTitle>
-                <DialogDescription>{active.author}</DialogDescription>
+                <DialogDescription>{bookInDialog?.author ?? active.author}</DialogDescription>
               </DialogHeader>
               <div className="grid gap-5 py-2 sm:grid-cols-[150px_1fr]">
                 <div>
                   <BookCover
-                    title={active.title}
-                    author={active.author}
-                    coverUrl={active.coverUrl}
+                    title={bookInDialog?.title ?? active.title}
+                    author={bookInDialog?.author ?? active.author}
+                    coverUrl={bookInDialog?.coverUrl}
                   />
                   <div className="mt-3 space-y-1 text-[0.7rem] text-muted-foreground">
-                    {active.pageCount ? <p>{active.pageCount} pages</p> : null}
-                    {active.language ? <p>{active.language}</p> : null}
-                    {active.publishedYear ? (
+                    {bookInDialog?.pageCount ? <p>{bookInDialog.pageCount} pages</p> : null}
+                    {bookInDialog?.language ? <p>{bookInDialog.language}</p> : null}
+                    {bookInDialog?.publishedYear ? (
                       <p>
-                        {active.publishedYear}
-                        {active.publisher ? ` · ${active.publisher}` : ""}
+                        {bookInDialog.publishedYear}
+                        {bookInDialog.publisher ? ` · ${bookInDialog.publisher}` : ""}
                       </p>
                     ) : null}
-                    {active.isbn ? <p className="font-mono">ISBN {active.isbn}</p> : null}
-                    {active.series ? <p>{active.series}</p> : null}
+                    {bookInDialog?.isbn ? <p className="font-mono">ISBN {bookInDialog.isbn}</p> : null}
+                    {bookInDialog?.series ? <p>{bookInDialog.series}</p> : null}
                     {active.rating ? (
                       <span className="inline-flex items-center gap-1">
                         <Stars value={active.rating} size={11} />
@@ -715,10 +739,93 @@ export default function Discover() {
                   </div>
                 </div>
                 <div>
-                  <p className="max-h-40 overflow-y-auto text-[0.8rem] leading-relaxed text-muted-foreground">
-                    {active.description ??
-                      "No description is available for this edition. You can add your own notes after saving it."}
-                  </p>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="max-h-32 flex-1 overflow-y-auto text-[0.8rem] leading-relaxed text-muted-foreground">
+                      {bookInDialog?.description ??
+                        "No description is available for this edition. You can add your own notes after saving it."}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="shrink-0 rounded-full text-[0.7rem]"
+                      onClick={() => setEditingDetails((current) => !current)}
+                    >
+                      {editingDetails ? "Done editing" : "Edit details"}
+                    </Button>
+                  </div>
+                  {editingDetails && draft ? (
+                    <div className="mt-3 grid gap-3 rounded-lg border border-border/70 bg-secondary/35 p-3 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="discover-title" className="label-caps">Title</Label>
+                        <Input id="discover-title" value={draft.title} onChange={(event) => updateDraftText("title", event.target.value)} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="discover-author" className="label-caps">Author</Label>
+                        <Input id="discover-author" value={draft.author} onChange={(event) => updateDraftText("author", event.target.value)} />
+                      </div>
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <Label htmlFor="discover-cover" className="label-caps">Cover image URL</Label>
+                        <Input
+                          id="discover-cover"
+                          type="url"
+                          value={draft.coverUrl ?? ""}
+                          onChange={(event) => updateDraftText("coverUrl", event.target.value)}
+                          placeholder="Paste a Google Books image URL"
+                        />
+                        {active.coverUrl ? (
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            className="h-auto p-0 text-xs"
+                            onClick={() => updateDraftText("coverUrl", active.coverUrl ?? "")}
+                          >
+                            Use catalogue cover
+                          </Button>
+                        ) : null}
+                        <p className="text-[0.65rem] text-muted-foreground">Leave the original link as-is, or paste a direct image URL to use another cover.</p>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="discover-isbn" className="label-caps">ISBN</Label>
+                        <Input id="discover-isbn" value={draft.isbn ?? ""} onChange={(event) => updateDraftText("isbn", event.target.value)} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="discover-genre" className="label-caps">Genre</Label>
+                        <Input id="discover-genre" value={draft.genre ?? ""} onChange={(event) => updateDraftText("genre", event.target.value)} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="discover-language" className="label-caps">Language</Label>
+                        <Input id="discover-language" value={draft.language ?? ""} onChange={(event) => updateDraftText("language", event.target.value)} />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1.5">
+                          <Label htmlFor="discover-pages" className="label-caps">Pages</Label>
+                          <Input id="discover-pages" type="number" min={1} value={draft.pageCount ?? ""} onChange={(event) => updateDraftNumber("pageCount", event.target.value)} />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label htmlFor="discover-year" className="label-caps">Year</Label>
+                          <Input id="discover-year" type="number" value={draft.publishedYear ?? ""} onChange={(event) => updateDraftNumber("publishedYear", event.target.value)} />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="discover-publisher" className="label-caps">Publisher</Label>
+                        <Input id="discover-publisher" value={draft.publisher ?? ""} onChange={(event) => updateDraftText("publisher", event.target.value)} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="discover-series" className="label-caps">Series</Label>
+                        <Input id="discover-series" value={draft.series ?? ""} onChange={(event) => updateDraftText("series", event.target.value)} />
+                      </div>
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <Label htmlFor="discover-format" className="label-caps">Format</Label>
+                        <Input id="discover-format" value={draft.format ?? ""} onChange={(event) => updateDraftText("format", event.target.value)} placeholder="Paperback, ebook, audiobook…" />
+                      </div>
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <Label htmlFor="discover-description" className="label-caps">Description</Label>
+                        <Textarea id="discover-description" rows={3} value={draft.description ?? ""} onChange={(event) => updateDraftText("description", event.target.value)} />
+                      </div>
+                    </div>
+                  ) : null}
                   <div className="mt-5 space-y-3">
                     <div className="flex flex-wrap items-center gap-2 pt-1">
                       <Select
@@ -842,13 +949,14 @@ function ManualAddDialog({
       };
       const readerIds = [defaultReader];
       if (mode === "wishlist") {
-        await addWish({ book: payload, readerIds, priority: "soon" });
+        await addWish({ book: payload, readerIds, priority: "soon", updateBookDetails: true });
         toast.success("Added to the wishlist.");
       } else {
         await startReading({
           book: payload,
           readerIds,
           mode: "individual",
+          updateBookDetails: true,
         });
         toast.success("Added to Currently Reading.");
       }

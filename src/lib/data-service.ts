@@ -73,7 +73,11 @@ async function documents() {
   return normalizeRows(await rows("libraryDocuments"));
 }
 
-async function findOrCreateBook(payload: Record<string, any>, discovered = false) {
+async function findOrCreateBook(
+  payload: Record<string, any>,
+  discovered = false,
+  updateExisting = false,
+) {
   const list = await books();
   const isbn = (payload.isbn ?? "").replace(/[^0-9Xx]/g, "").toUpperCase();
   const existing = list.find((book) =>
@@ -81,7 +85,24 @@ async function findOrCreateBook(payload: Record<string, any>, discovered = false
       : book.title.toLowerCase() === String(payload.title).toLowerCase() &&
         book.author.toLowerCase() === String(payload.author).toLowerCase(),
   );
-  if (existing) return existing;
+  if (existing) {
+    if (!updateExisting) return existing;
+    const patch: Record<string, any> = {};
+    for (const field of [
+      "title", "author", "isbn", "description", "coverUrl", "genre", "language",
+      "publisher", "series", "format",
+    ]) {
+      if (typeof payload[field] === "string" && payload[field].trim()) {
+        patch[field] = payload[field].trim();
+      }
+    }
+    for (const field of ["pageCount", "publishedYear"]) {
+      if (typeof payload[field] === "number" && payload[field] > 0) {
+        patch[field] = payload[field];
+      }
+    }
+    return Object.keys(patch).length ? await update("books", existing.id, patch) : existing;
+  }
   return await insert("books", {
     householdId: HOUSEHOLD_ID,
     title: String(payload.title ?? "Untitled").trim(),
@@ -391,7 +412,7 @@ export async function runMutation(name: string, args: any): Promise<any> {
     }
     case "books.setSpineColor": result = await update("books", args.bookId, { spineColor: args.color }); break;
     case "books.startReading": {
-      const book = await findOrCreateBook(args.book, true);
+      const book = await findOrCreateBook(args.book, true, Boolean(args.updateBookDetails));
       const readerIds = args.readerIds?.length ? args.readerIds : [readerId];
       for (const id of readerIds) {
         const old = (await records()).find((record) => record.bookId === book.id && record.readerId === id);
@@ -428,7 +449,7 @@ export async function runMutation(name: string, args: any): Promise<any> {
       break;
     }
     case "books.markAsRead": {
-      const book = await findOrCreateBook(args.book, true);
+      const book = await findOrCreateBook(args.book, true, Boolean(args.updateBookDetails));
       const readerIds = args.readerIds?.length ? args.readerIds : [readerId];
       for (const id of readerIds) {
         const old = (await records()).find((record) => record.bookId === book.id && record.readerId === id);
@@ -468,7 +489,7 @@ export async function runMutation(name: string, args: any): Promise<any> {
       result = await update("readingRecords", record.id, { rating: args.rating ?? record.rating, review: args.review ?? record.review, notes: args.notes ?? record.notes, updatedAt: timestamp }); break;
     }
     case "wishlist.add": {
-      const book = await findOrCreateBook(args.book, true);
+      const book = await findOrCreateBook(args.book, true, Boolean(args.updateBookDetails));
       for (const id of (args.readerIds?.length ? args.readerIds : [readerId])) {
         const old = (await wishes()).find((wish) => wish.bookId === book.id && wish.readerId === id);
         if (old) await update("wishlistItems", old.id, { priority: args.priority, note: args.note ?? old.note });
