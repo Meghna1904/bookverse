@@ -668,8 +668,8 @@ export default function BookDetail() {
                   <Input id="record-edit-finish" type="date" value={recordDraft.completionDate} onChange={(event) => setRecordDraft({ ...recordDraft, completionDate: event.target.value })} disabled={recordDraft.status !== "completed"} />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
-                  <Label htmlFor="record-edit-rating">Rating (1–5)</Label>
-                  <Input id="record-edit-rating" type="number" min={1} max={5} step={1} value={recordDraft.rating} onChange={(event) => setRecordDraft({ ...recordDraft, rating: event.target.value })} placeholder="Optional" />
+                  <Label htmlFor="record-edit-rating">Rating (½–5 stars)</Label>
+                  <Input id="record-edit-rating" type="number" min={0.5} max={5} step={0.5} value={recordDraft.rating} onChange={(event) => setRecordDraft({ ...recordDraft, rating: event.target.value })} placeholder="Optional" />
                 </div>
                 <div className="space-y-1.5 sm:col-span-2">
                   <Label htmlFor="record-edit-review">Review</Label>

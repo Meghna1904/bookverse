@@ -425,7 +425,7 @@ export function CheckInDialog({
       setRuleHint(
         result.qualifies
           ? `Logged. ${result.dayPages} pages and ${result.dayMinutes} minutes today — this day counts toward your streak.`
-          : `Logged. ${result.dayPages} pages and ${result.dayMinutes} minutes today. Reach 5 pages or 10 minutes for the day to count.`,
+          : `Logged ${result.dayMinutes} minutes. Save progress of at least one page today for this day to count toward your streak.`,
       );
       toast.success("Reading session recorded.");
     } catch (error) {

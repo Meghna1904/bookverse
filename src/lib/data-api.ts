@@ -10,7 +10,7 @@ export type HomeResult = {
   weekly: { days: { dayKey: string; label: string; pages: number[]; shared: boolean }[]; pages: number; minutes: number; readingDays: number; readerPages: number[] };
   activity: DbRow[];
   myUserId: string;
-  streakRule: { minutes: number; pages: number };
+  streakRule: { pages: number };
 };
 export type ProfileOverviewPerson = ReaderRow & {
   bio: string; isMe: boolean; stats: DbRow;
@@ -19,13 +19,13 @@ export type ProfileOverviewPerson = ReaderRow & {
   wishlist: { item: DbRow; book: DbRow }[];
 };
 export type StatsPageResult = {
-  readers: (DbRow & { displayName: string; readingDays: number; pagesRead: number; booksCompleted: number; currentStreak: number; milestones: { days: number; achieved: boolean; shared: boolean }[] })[];
+  readers: (DbRow & { displayName: string; readingDays: number; pagesRead: number; booksCompleted: number; currentStreak: number; bestStreak: number; milestones: { days: number; achieved: boolean; shared: boolean }[] })[];
   shared: DbRow & { milestones: { days: number; achieved: boolean; shared: boolean }[] };
   weekly: { label: string; dayKey: string; pages: number[]; minutes: number[]; shared: boolean }[];
   monthly: { label: string; pages: number[]; minutes: number[]; books: number[] }[];
   genres: { genre: string; count: number }[];
   streakHistory: { dayKey: string; readers: boolean[]; shared: boolean }[];
-  streakRule: { minutes: number; pages: number };
+  streakRule: { pages: number };
   allBooksCompleted: number;
 };
 export type QueryResultMap = {

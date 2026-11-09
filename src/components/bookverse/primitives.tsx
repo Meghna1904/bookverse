@@ -174,36 +174,45 @@ export function Stars({
   className?: string;
 }) {
   return (
-    <div className={cn("flex items-center gap-0.5", className)}>
+    <div className={cn("flex items-center gap-0.5", className)} role={onChange ? "group" : undefined} aria-label={onChange ? "Choose a rating" : undefined}>
       {[1, 2, 3, 4, 5].map((star) => {
-        const filled = (value ?? 0) >= star;
-        if (!onChange) {
-          return (
-            <Star
-              key={star}
-              className={cn(
-                "shrink-0",
-                filled ? "fill-gold text-gold" : "text-border",
-              )}
-              style={{ width: size, height: size }}
-            />
-          );
-        }
+        const fillPercent = Math.max(0, Math.min(100, ((value ?? 0) - star + 1) * 100));
         return (
-          <button
-            key={star}
-            type="button"
-            aria-label={`${star} star${star > 1 ? "s" : ""}`}
-            onClick={() => onChange(star)}
-            className="rounded-sm p-0.5 transition hover:scale-110"
-          >
+          <span key={star} className="relative inline-block shrink-0" style={{ width: size, height: size }}>
             <Star
-              className={cn(
-                filled ? "fill-gold text-gold" : "text-border hover:text-gold/60",
-              )}
+              aria-hidden="true"
+              className="absolute inset-0 text-border"
               style={{ width: size, height: size }}
             />
-          </button>
+            <span
+              className="pointer-events-none absolute inset-y-0 left-0 overflow-hidden"
+              style={{ width: `${fillPercent}%` }}
+            >
+              <Star
+                aria-hidden="true"
+                className="max-w-none fill-gold text-gold"
+                style={{ width: size, height: size }}
+              />
+            </span>
+            {onChange ? (
+              <>
+                <button
+                  type="button"
+                  aria-label={`Rate ${star - 0.5} star${star === 1 ? "" : "s"}`}
+                  title={`${star - 0.5} stars`}
+                  onClick={() => onChange(star - 0.5)}
+                  className="absolute inset-y-0 left-0 z-10 w-1/2 rounded-l-sm outline-offset-1 focus-visible:outline focus-visible:outline-forest"
+                />
+                <button
+                  type="button"
+                  aria-label={`Rate ${star} star${star === 1 ? "" : "s"}`}
+                  title={`${star} stars`}
+                  onClick={() => onChange(star)}
+                  className="absolute inset-y-0 right-0 z-10 w-1/2 rounded-r-sm outline-offset-1 focus-visible:outline focus-visible:outline-forest"
+                />
+              </>
+            ) : null}
+          </span>
         );
       })}
     </div>

@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { useQueryState } from "@/lib/data-hooks";
 import { supabase } from "@/lib/supabase";
 import {
-  Bell,
+  ChartNoAxesCombined,
   BookOpen,
   ChevronDown,
   Heart,
@@ -36,7 +36,7 @@ const NAV = [
   { to: "/wishlist", label: "Wishlist", icon: Heart },
   { to: "/memories", label: "Our Memories", icon: Images },
   { to: "/discover", label: "Discover", icon: Search, iconOnly: true },
-  { to: "/stats", label: "Our Stats", icon: Bell, iconOnly: true },
+  { to: "/stats", label: "Our Stats", icon: ChartNoAxesCombined, iconOnly: true },
   { to: "/profiles", label: "Profiles", icon: UserRound },
 ];
 
@@ -154,15 +154,6 @@ export function AppShell() {
             >
               <Search className="size-[1.05rem]" strokeWidth={1.7} />
             </Link>
-            <Link
-              to="/stats"
-              aria-label="Recent reading activity"
-              title="Recent reading activity"
-              className="relative inline-flex size-9 items-center justify-center rounded-full border border-border/70 bg-card/60 text-muted-foreground transition hover:border-olive/60 hover:bg-secondary hover:text-foreground"
-            >
-              <Bell className="size-[1.05rem]" strokeWidth={1.7} />
-              <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full border border-background bg-terracotta" />
-            </Link>
             <ThemeToggle className="hidden sm:inline-flex" />
 
             <DropdownMenu>
@@ -196,6 +187,10 @@ export function AppShell() {
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => navigate("/memories")}>
                   Our memories
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => navigate("/stats")}>
+                  <ChartNoAxesCombined className="mr-2 size-3.5" />
+                  Our Stats
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem

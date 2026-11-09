@@ -10,7 +10,55 @@ import { announceDataChange } from "./data-hooks";
 type Row = Record<string, any> & { id: string };
 const DAY_MS = 86_400_000;
 const now = () => Date.now();
-const dayKey = (time = now()) => new Date(time).toISOString().slice(0, 10);
+const dayKey = (time = now()) => {
+  const date = new Date(time);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+};
+
+function localDayOffset(offset: number, base = new Date(now())) {
+  const date = new Date(base);
+  date.setHours(12, 0, 0, 0);
+  date.setDate(date.getDate() - offset);
+  return dayKey(date.getTime());
+}
+
+function dayOrdinal(key: string) {
+  const [year, month, day] = key.split("-").map(Number);
+  return Date.UTC(year, month - 1, day) / DAY_MS;
+}
+
+function streakSummary(dayKeys: Iterable<string>) {
+  const days = [...new Set(dayKeys)].sort();
+  let best = 0;
+  let run = 0;
+  let previous = -2;
+  for (const key of days) {
+    const ordinal = dayOrdinal(key);
+    run = ordinal === previous + 1 ? run + 1 : 1;
+    best = Math.max(best, run);
+    previous = ordinal;
+  }
+
+  const qualified = new Set(days);
+  const today = dayKey();
+  let cursor = qualified.has(today) ? today : localDayOffset(1);
+  let current = 0;
+  while (qualified.has(cursor)) {
+    current += 1;
+    const previousDate = new Date(`${cursor}T12:00:00`);
+    previousDate.setDate(previousDate.getDate() - 1);
+    cursor = dayKey(previousDate.getTime());
+  }
+  return { days: qualified, current, best };
+}
+
+function readerStreak(sessions: Row[], readerId: string) {
+  return streakSummary(
+    sessions
+      .filter((session) => session.readerId === readerId && Number(session.pages) > 0)
+      .map((session) => session.dayKey),
+  );
+}
 
 async function rows(table: string): Promise<Row[]> {
   const { data, error } = await requireSupabase().from(table).select("*");
@@ -324,12 +372,13 @@ async function profileOverview() {
   const peopleData = people.map((person) => {
     const personRecords = allRecords.filter((record) => record.readerId === person.id);
     const personSessions = allSessions.filter((session) => session.readerId === person.id);
+    const streak = readerStreak(allSessions, person.id);
     const completed = personRecords.filter((record) => record.status === "completed");
     const ratings = completed.map((record) => record.rating).filter((rating) => typeof rating === "number");
     return { userId: person.id, profileId: person.id, displayName: person.displayName, bio: person.bio ?? "", avatarUrl: person.avatarUrl ?? null,
       favoriteGenres: person.favoriteGenres ?? [], languages: person.languages ?? ["English"], shareActivity: person.shareActivity ?? true,
       isSample: false, isMe: person.id === currentId(), email: null, joinedAt: person.joinedAt,
-      stats: { currentStreak: 0, bestStreak: 0, readingDays: new Set(personSessions.filter((s) => s.pages >= 5 || s.minutes >= 10).map((s) => s.dayKey)).size,
+      stats: { currentStreak: streak.current, bestStreak: streak.best, readingDays: streak.days.size,
         weekDays: 0, booksCompleted: completed.length, pagesRead: personSessions.reduce((a, s) => a + s.pages, 0), minutesRead: personSessions.reduce((a, s) => a + s.minutes, 0),
         averageRating: ratings.length ? Math.round(ratings.reduce((a, b) => a + b, 0) / ratings.length * 10) / 10 : null }, privateActivity: false,
       reading: personRecords.filter((record) => record.status === "reading").map((record) => ({ record, book: byBook.get(record.bookId) })).filter((item) => item.book),
@@ -352,13 +401,71 @@ async function homeStats() {
     const entries = list.map((record) => ({ record, readerId: record.readerId, readerName: names.get(record.readerId) ?? "Reader", percent: book.pageCount ? Math.min(100, Math.round(record.currentPage / book.pageCount * 100)) : 0 }));
     return [{ book: { ...book, _id: book.id }, records: entries, percent: Math.max(...entries.map((item) => item.percent), 0), total: book.pageCount ?? 0 }];
   });
-  const readers = people.map((person) => ({ userId: person.id, displayName: person.displayName, avatarUrl: person.avatarUrl ?? null, isSample: false, current: 0, best: 0, totalDays: 0, weekDays: 0 }));
+  const readerStreaks = new Map(people.map((person) => [person.id, readerStreak(allSessions, person.id)]));
+  const weekStart = localDayOffset(6);
+  const readers = people.map((person) => {
+    const streak = readerStreaks.get(person.id)!;
+    return {
+      userId: person.id,
+      displayName: person.displayName,
+      avatarUrl: person.avatarUrl ?? null,
+      isSample: false,
+      current: streak.current,
+      best: streak.best,
+      totalDays: streak.days.size,
+      weekDays: [...streak.days].filter((key) => key >= weekStart).length,
+    };
+  });
+  const sharedDays = people.length > 1
+    ? [...(readerStreaks.get(people[0].id)?.days ?? [])].filter((key) =>
+      people.slice(1).every((person) => readerStreaks.get(person.id)?.days.has(key)),
+    )
+    : [];
+  const sharedStreak = streakSummary(sharedDays);
   const completed = allRecords.filter((record) => record.status === "completed");
   const finishedIds = new Set(completed.map((record) => record.bookId));
   const activityItems = activity.sort((a, b) => b.createdAt - a.createdAt).slice(0, 9).map((item) => ({ ...item, _id: item.id, readerName: names.get(item.readerId) ?? "Reader", isMine: item.readerId === currentId() }));
-  const weekly = [6,5,4,3,2,1,0].map((offset) => { const d = new Date(now() - offset * DAY_MS); const key = dayKey(d.getTime()); const todaySessions = allSessions.filter((s) => s.dayKey === key); return { dayKey: key, label: ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getUTCDay()], pages: people.map((p) => todaySessions.filter((s) => s.readerId === p.id).reduce((a,s) => a+s.pages,0)), shared: false }; });
-  const weekSessions = allSessions.filter((session) => session.dayKey >= dayKey(now() - 6 * DAY_MS));
-  return { householdName: home.name, readers, shared: { daysThisWeek: 0, totalDays: 0, booksCompleted: finishedIds.size, readingRecordsCompleted: completed.length, pagesRead: allSessions.reduce((a,s)=>a+s.pages,0), minutesRead: allSessions.reduce((a,s)=>a+s.minutes,0), currentlyReading: grouped.size, sharedBooksCompleted: 0, wishlistCount: allWishes.length }, currentlyReading, digital: [], weekly: { days: weekly, pages: weekSessions.reduce((a,s)=>a+s.pages,0), minutes: weekSessions.reduce((a,s)=>a+s.minutes,0), readingDays: new Set(weekSessions.map((s)=>s.dayKey)).size, readerPages: people.map((p)=>weekSessions.filter((s)=>s.readerId===p.id).reduce((a,s)=>a+s.pages,0)) }, activity: activityItems, myUserId: currentId(), streakRule: { minutes: 10, pages: 5 } };
+  const weekly = [6,5,4,3,2,1,0].map((offset) => {
+    const key = localDayOffset(offset);
+    const date = new Date(`${key}T12:00:00`);
+    const todaySessions = allSessions.filter((session) => session.dayKey === key);
+    return {
+      dayKey: key,
+      label: ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][date.getDay()],
+      pages: people.map((person) => todaySessions.filter((session) => session.readerId === person.id).reduce((sum, session) => sum + session.pages, 0)),
+      shared: sharedStreak.days.has(key),
+    };
+  });
+  const weekSessions = allSessions.filter((session) => session.dayKey >= weekStart);
+  return {
+    householdName: home.name,
+    readers,
+    shared: {
+      daysThisWeek: sharedDays.filter((key) => key >= weekStart).length,
+      totalDays: 0,
+      booksCompleted: finishedIds.size,
+      readingRecordsCompleted: completed.length,
+      pagesRead: allSessions.reduce((sum, session) => sum + session.pages, 0),
+      minutesRead: allSessions.reduce((sum, session) => sum + session.minutes, 0),
+      currentlyReading: grouped.size,
+      sharedBooksCompleted: 0,
+      wishlistCount: allWishes.length,
+      currentStreak: sharedStreak.current,
+      bestStreak: sharedStreak.best,
+    },
+    currentlyReading,
+    digital: [],
+    weekly: {
+      days: weekly,
+      pages: weekSessions.reduce((sum, session) => sum + session.pages, 0),
+      minutes: weekSessions.reduce((sum, session) => sum + session.minutes, 0),
+      readingDays: new Set(weekSessions.filter((session) => session.pages > 0).map((session) => session.dayKey)).size,
+      readerPages: people.map((person) => weekSessions.filter((session) => session.readerId === person.id).reduce((sum, session) => sum + session.pages, 0)),
+    },
+    activity: activityItems,
+    myUserId: currentId(),
+    streakRule: { pages: 1 },
+  };
 }
 
 async function statsPage() {
@@ -366,32 +473,52 @@ async function statsPage() {
   const completed = allRecords.filter((record) => record.status === "completed");
   const readers = people.map((person) => {
     const ss = allSessions.filter((session) => session.readerId === person.id);
+    const streak = readerStreak(allSessions, person.id);
     const rr = completed.filter((record) => record.readerId === person.id);
     const rated = rr.map((record) => record.rating).filter((rating) => typeof rating === "number");
-    const qualified = new Set(ss.filter((session) => session.pages >= 5 || session.minutes >= 10).map((session) => session.dayKey));
     return { userId: person.id, displayName: person.displayName, isSample: false, avatarUrl: person.avatarUrl ?? null,
-      booksCompleted: rr.length, pagesRead: ss.reduce((a,s)=>a+s.pages,0), minutesRead: ss.reduce((a,s)=>a+s.minutes,0), currentStreak: 0,
-      bestStreak: 0, readingDays: qualified.size, currentlyReading: allRecords.filter((record)=>record.readerId===person.id&&record.status==="reading").length,
+      booksCompleted: rr.length, pagesRead: ss.reduce((a,s)=>a+s.pages,0), minutesRead: ss.reduce((a,s)=>a+s.minutes,0), currentStreak: streak.current,
+      bestStreak: streak.best, readingDays: streak.days.size, currentlyReading: allRecords.filter((record)=>record.readerId===person.id&&record.status==="reading").length,
       averageRating: rated.length ? Math.round(rated.reduce((a,b)=>a+b,0)/rated.length*10)/10 : null, ratingsGiven: rated.length,
-      milestones: [7,14,30,60,100].map((days)=>({days,achieved:qualified.size>=days,shared:false})) };
+      milestones: [7,14,30,60,100].map((days)=>({days,achieved:streak.best>=days,shared:false})) };
   });
   const genres = [...groupBy(completed, (record) => allBooks.find((book) => book.id === record.bookId)?.genre ?? "Unclassified")].map(([genre, group])=>({genre,count:group.length})).sort((a,b)=>b.count-a.count).slice(0,7);
-  const weekDays = [6,5,4,3,2,1,0].map((offset)=>{const date=new Date(now()-offset*DAY_MS);const key=dayKey(date.getTime());const daily=allSessions.filter((s)=>s.dayKey===key);return{label:["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][date.getUTCDay()],dayKey:key,pages:people.map((p)=>daily.filter((s)=>s.readerId===p.id).reduce((a,s)=>a+s.pages,0)),minutes:people.map((p)=>daily.filter((s)=>s.readerId===p.id).reduce((a,s)=>a+s.minutes,0)),shared:false};});
-  const streakHistory = Array.from({length:56},(_,i)=>{const key=dayKey(now()-(55-i)*DAY_MS);const flags=people.map((person)=>allSessions.filter((s)=>s.readerId===person.id&&s.dayKey===key).some((s)=>s.pages>=5||s.minutes>=10));return{dayKey:key,readers:flags,shared:flags.length===2&&flags.every(Boolean)};});
+  const readerStreaks = new Map(people.map((person) => [person.id, readerStreak(allSessions, person.id)]));
+  const sharedDays = people.length > 1
+    ? [...(readerStreaks.get(people[0].id)?.days ?? [])].filter((key) => people.slice(1).every((person) => readerStreaks.get(person.id)?.days.has(key)))
+    : [];
+  const sharedStreak = streakSummary(sharedDays);
+  const weekDays = [6,5,4,3,2,1,0].map((offset) => {
+    const key = localDayOffset(offset);
+    const date = new Date(`${key}T12:00:00`);
+    const daily = allSessions.filter((session) => session.dayKey === key);
+    return {
+      label: ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][date.getDay()],
+      dayKey: key,
+      pages: people.map((person) => daily.filter((session) => session.readerId === person.id).reduce((sum, session) => sum + session.pages, 0)),
+      minutes: people.map((person) => daily.filter((session) => session.readerId === person.id).reduce((sum, session) => sum + session.minutes, 0)),
+      shared: sharedStreak.days.has(key),
+    };
+  });
+  const streakHistory = Array.from({ length: 56 }, (_, index) => {
+    const key = localDayOffset(55 - index);
+    const flags = people.map((person) => readerStreaks.get(person.id)?.days.has(key) ?? false);
+    return { dayKey: key, readers: flags, shared: flags.length === 2 && flags.every(Boolean) };
+  });
   const monthly = Array.from({length:6},(_,i)=>{const date=new Date();date.setDate(1);date.setMonth(date.getMonth()-(5-i));const key=`${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,"0")}`;const ms=allSessions.filter((s)=>s.dayKey.startsWith(key));return{label:date.toLocaleString("en",{month:"short"}),pages:people.map((p)=>ms.filter((s)=>s.readerId===p.id).reduce((a,s)=>a+s.pages,0)),minutes:people.map((p)=>ms.filter((s)=>s.readerId===p.id).reduce((a,s)=>a+s.minutes,0)),books:people.map((p)=>completed.filter((r)=>r.readerId===p.id&&String(r.completionDate??"").startsWith(key)).length)};});
   const totalPagesRead = allSessions.reduce((sum, session) => sum + session.pages, 0);
   const totalMinutesRead = allSessions.reduce((sum, session) => sum + session.minutes, 0);
   return {
     readers,
     shared: {
-      currentStreak: 0, bestStreak: 0, readingDays: 0, pagesRead: totalPagesRead, minutesRead: totalMinutesRead,
+      currentStreak: sharedStreak.current, bestStreak: sharedStreak.best, readingDays: sharedStreak.days.size, pagesRead: totalPagesRead, minutesRead: totalMinutesRead,
       booksCompleted: completed.length, booksTogether: 0, pagesTogether: 0, booksReadTogether: 0,
-      pagesReadTogether: 0, sharedReadingDays: 0, sharedCurrentStreak: 0, sharedBestStreak: 0,
+      pagesReadTogether: 0, sharedReadingDays: sharedStreak.days.size, sharedCurrentStreak: sharedStreak.current, sharedBestStreak: sharedStreak.best,
       totalBooksCompleted: completed.length, totalPagesRead, totalMinutesRead, digitalDocuments: 0,
-      milestones: [7,14,30,60,100].map((days)=>({days,achieved:false,shared:true})),
+      milestones: [7,14,30,60,100].map((days)=>({days,achieved:sharedStreak.best>=days,shared:true})),
     },
     weekly: weekDays, monthly, genres, streakHistory,
-    streakRule: { minutes: 10, pages: 5 },
+    streakRule: { pages: 1 },
     allBooksCompleted: completed.length,
   };
 }
@@ -460,8 +587,8 @@ export async function runMutation(name: string, args: any): Promise<any> {
       }
       if (status === "completed" && completionDate === null) throw new Error("Enter the date you finished reading.");
       const rating = values.rating === "" || values.rating == null ? null : Number(values.rating);
-      if (rating !== null && (!Number.isFinite(rating) || rating < 1 || rating > 5)) {
-        throw new Error("Rating must be between one and five.");
+      if (rating !== null && (!Number.isFinite(rating) || rating < 0.5 || rating > 5 || rating * 2 !== Math.round(rating * 2))) {
+        throw new Error("Rating must be between half a star and five stars in half-star steps.");
       }
       result = await update("readingRecords", record.id, {
         status,
@@ -616,10 +743,12 @@ async function upsertSession(bookId: string | null, documentId: string | null, p
 }
 
 async function checkIn(args: any) {
-  await upsertSession(args.bookId ?? null, args.documentId ?? null, Math.max(0, Math.round(args.pages)), Math.max(0, Math.round(args.minutes)), args.dayKey);
+  const pages = Math.max(0, Math.round(args.pages));
+  const minutes = Math.max(0, Math.round(args.minutes));
+  await upsertSession(args.bookId ?? null, args.documentId ?? null, pages, minutes, args.dayKey);
   const book = args.bookId ? await one("books", args.bookId) : null;
-  await logActivity(args.documentId ? "pdf-session" : "session", book?.title ?? "Reading session", `${args.pages} pages · ${args.minutes} minutes`, args.bookId, args.documentId);
-  return { qualifies: args.pages >= 5 || args.minutes >= 10, dayPages: args.pages, dayMinutes: args.minutes };
+  await logActivity(args.documentId ? "pdf-session" : "session", book?.title ?? "Reading session", `${pages} pages · ${minutes} minutes`, args.bookId, args.documentId);
+  return { qualifies: pages > 0, dayPages: pages, dayMinutes: minutes };
 }
 
 async function createDocument(args: any) {
@@ -639,7 +768,10 @@ async function saveDocumentProgress(args: any) {
   if (old) await update("documentProgress", old.id, { lastPage, minutes: old.minutes + Math.max(0, args.minutes ?? 0), updatedAt: now() });
   else await insert("documentProgress", { documentId: doc.id, householdId: HOUSEHOLD_ID, readerId: currentId(), lastPage, totalPages: doc.totalPages, minutes: Math.max(0, args.minutes ?? 0), updatedAt: now() });
   await update("libraryDocuments", doc.id, { updatedAt: now() });
-  if ((args.pagesRead ?? 0) > 0 || (args.minutes ?? 0) > 0) await upsertSession(doc.bookId ?? null, doc.id, args.pagesRead ?? 0, args.minutes ?? 0, args.dayKey);
+  const pageAdvance = Math.max(0, lastPage - (old?.lastPage ?? 1));
+  if (pageAdvance > 0 || (args.minutes ?? 0) > 0) {
+    await upsertSession(doc.bookId ?? null, doc.id, pageAdvance, args.minutes ?? 0, args.dayKey);
+  }
   return { lastPage };
 }
 

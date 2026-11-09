@@ -106,7 +106,7 @@ export default function Stats() {
       <PageHeader
         eyebrow="Our Stats"
         title="Two reading lives, measured gently."
-        description={`A day counts for a reader when they finish ${data.streakRule.minutes} minutes or ${data.streakRule.pages} pages — print or PDF. Opening a document never counts. Streaks are individual; the shelf is shared.`}
+        description="A day counts when you advance at least one page in print or PDF. Resaving the same page doesn’t count, and multiple advances on one day still count as one streak day. Streaks are individual; the shelf is shared."
       />
 
       <section className="grid gap-5 md:grid-cols-2">
