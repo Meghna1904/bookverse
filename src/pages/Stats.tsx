@@ -1,4 +1,4 @@
-import { api } from "@/convex/_generated/api";
+import { api } from "@/lib/data-api";
 import {
   Avatar,
   PageHeader,
@@ -7,7 +7,7 @@ import {
 } from "@/components/bookverse/primitives";
 import { formatMinutes } from "@/lib/bookverse";
 import { cn } from "@/lib/utils";
-import { useQuery } from "convex/react";
+import { useQuery } from "@/lib/data-hooks";
 import { Flame, Sparkles, Trophy } from "lucide-react";
 import {
   Bar,

@@ -1,5 +1,5 @@
-import { api } from "@/convex/_generated/api";
-import type { Doc, Id } from "@/convex/_generated/dataModel";
+import { api } from "@/lib/data-api";
+import type { Doc, Id } from "@/lib/db-types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,7 +21,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { errorMessage, formatDate, localDayKey, readingPercent } from "@/lib/bookverse";
 import { cn } from "@/lib/utils";
-import { useMutation } from "convex/react";
+import { useMutation } from "@/lib/data-hooks";
 import { Loader2, Minus, Plus, Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";

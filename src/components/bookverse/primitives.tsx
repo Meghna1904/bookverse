@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import { coverPalette, initials, spinePalette } from "@/lib/bookverse";
-import type { Id } from "@/convex/_generated/dataModel";
+import type { Id } from "@/lib/db-types";
 import { Check, Star } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 

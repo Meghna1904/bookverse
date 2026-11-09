@@ -1,5 +1,5 @@
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
+import { api } from "@/lib/data-api";
+import type { Id } from "@/lib/db-types";
 import {
   BookCover,
   SectionHeading,
@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { errorMessage, formatDate, formatDayKey, formatMinutes } from "@/lib/bookverse";
 import { cn } from "@/lib/utils";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "@/lib/data-hooks";
 import {
   ArrowLeft,
   BookOpen,

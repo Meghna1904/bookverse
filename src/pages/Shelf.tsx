@@ -1,5 +1,5 @@
-import { api } from "@/convex/_generated/api";
-import type { Doc, Id } from "@/convex/_generated/dataModel";
+import { api } from "@/lib/data-api";
+import type { Doc, Id } from "@/lib/db-types";
 import { BookSpine, PageHeader } from "@/components/bookverse/primitives";
 import { Button } from "@/components/ui/button";
 import {
@@ -12,7 +12,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { errorMessage } from "@/lib/bookverse";
 import { cn } from "@/lib/utils";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "@/lib/data-hooks";
 import {
   ArrowDownAZ,
   ArrowRight,

@@ -1,20 +1,12 @@
-import '@vly-ai/integrations';
 import { ThemedToaster } from "@/components/bookverse/ThemeToggle";
-import { RequireAuth } from "@/components/RequireAuth";
-import { VlyToolbar } from "../vly-toolbar-readonly.tsx";
-import { ConvexAuthProvider } from "@convex-dev/auth/react";
-import { ConvexReactClient } from "convex/react";
 import React, { StrictMode, useEffect, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router";
 import { AppShell } from "./components/bookverse/AppShell";
 import { SiteDoodles } from "./components/bookverse/DoodleBackdrop";
-import { CONVEX_URL } from "./lib/convex-url";
 import "./index.css";
 
 // Lazy load route components for better code splitting
-const AuthPage = lazy(() => import("./pages/Auth.tsx"));
-const Welcome = lazy(() => import("./pages/Welcome.tsx"));
 const Home = lazy(() => import("./pages/Home.tsx"));
 const Shelf = lazy(() => import("./pages/Shelf.tsx"));
 const BookDetail = lazy(() => import("./pages/BookDetail.tsx"));
@@ -34,24 +26,6 @@ function RouteLoading() {
       <div className="animate-pulse text-muted-foreground">Loading...</div>
     </div>
   );
-}
-
-/** Silent error boundary — if VlyToolbar crashes it renders nothing instead of
- *  crashing the whole app (e.g. hook errors in the browser runtime). */
-class ToolbarErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean }
-> {
-  state = { hasError: false };
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-  componentDidCatch(err: Error) {
-    console.warn("[VlyToolbar] Caught error, toolbar disabled:", err.message);
-  }
-  render() {
-    return this.state.hasError ? null : this.props.children;
-  }
 }
 
 /** Hard guard so runtime errors never leave the preview as a blank page. */
@@ -92,10 +66,6 @@ class RootErrorBoundary extends React.Component<
   }
 }
 
-const convex = new ConvexReactClient(CONVEX_URL);
-
-
-
 function RouteSyncer() {
   const location = useLocation();
   useEffect(() => {
@@ -123,43 +93,16 @@ function RouteSyncer() {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <RootErrorBoundary>
-      <ToolbarErrorBoundary>
-        <VlyToolbar />
-      </ToolbarErrorBoundary>
-      <ConvexAuthProvider client={convex}>
-        <BrowserRouter>
+      <BrowserRouter>
           <RouteSyncer />
           <SiteDoodles />
           <Suspense fallback={<RouteLoading />}>
             <Routes>
-              <Route path="/" element={<AuthPage redirectAfterAuth="/home" />} />
-              <Route path="/auth" element={<AuthPage redirectAfterAuth="/home" />} />
-              <Route
-                path="/welcome"
-                element={
-                  <RequireAuth
-                    redirectImmediately
-                    title="Sign in to create your shared library"
-                  >
-                    <Welcome />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/read/:documentId"
-                element={
-                  <RequireAuth redirectImmediately title="Sign in to read">
-                    <PdfReader />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                element={
-                  <RequireAuth title="Sign in to your shared library">
-                    <AppShell />
-                  </RequireAuth>
-                }
-              >
+              <Route path="/" element={<Navigate to="/home" replace />} />
+              <Route path="/auth" element={<Navigate to="/home" replace />} />
+              <Route path="/welcome" element={<Navigate to="/home" replace />} />
+              <Route path="/read/:documentId" element={<PdfReader />} />
+              <Route element={<AppShell />}>
                 <Route path="/home" element={<Home />} />
                 <Route path="/shelf" element={<Shelf />} />
                 <Route path="/book/:bookId" element={<BookDetail />} />
@@ -174,9 +117,8 @@ createRoot(document.getElementById("root")!).render(
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
-        </BrowserRouter>
+      </BrowserRouter>
         <ThemedToaster />
-      </ConvexAuthProvider>
     </RootErrorBoundary>
   </StrictMode>,
 );

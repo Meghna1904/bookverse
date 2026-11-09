@@ -1,26 +1,21 @@
-import { api } from "@/convex/_generated/api";
-import { useAuthActions } from "@convex-dev/auth/react";
-import { useConvexAuth, useQuery } from "convex/react";
+import { api } from "@/lib/data-api";
+import { useQuery } from "@/lib/data-hooks";
+import { READER_IDS } from "@/lib/db-types";
+import { setReaderId, useReaderId } from "@/lib/reader-store";
 
 export function useAuth() {
-  const { isLoading: isAuthLoading, isAuthenticated } = useConvexAuth();
+  const readerId = useReaderId();
   const user = useQuery(api.users.currentUser);
-  const access = useQuery(api.pinAuth.access, isAuthenticated ? {} : "skip");
-  const { signIn, signOut } = useAuthActions();
-
-  // A Convex Auth session is only usable when it holds a room PIN credential.
-  const hasRoomAccess = Boolean(isAuthenticated && access?.allowed);
-  const isLoading =
-    isAuthLoading || user === undefined || (isAuthenticated && access === undefined);
-
+  const readerSlot = readerId === READER_IDS.matildaa ? "matildaa" : "whiskeyy";
   return {
-    isLoading,
-    isAuthenticated: hasRoomAccess,
-    hasConvexSession: isAuthenticated,
-    hasRoomAccess,
-    readerSlot: access?.slot ?? null,
+    isLoading: user === undefined,
+    isAuthenticated: true,
+    hasRoomAccess: true,
+    readerSlot,
     user,
-    signIn,
-    signOut,
+    signIn: async (_provider?: string, args?: { reader?: string }) => {
+      setReaderId(args?.reader === "matildaa" ? READER_IDS.matildaa : READER_IDS.whiskeyy);
+    },
+    signOut: async () => setReaderId(READER_IDS.whiskeyy),
   };
 }

@@ -1,7 +1,9 @@
-import { api } from "@/convex/_generated/api";
-import { useAuth } from "@/hooks/use-auth";
+import { api } from "@/lib/data-api";
+import { READER_IDS } from "@/lib/db-types";
+import { setReaderId } from "@/lib/reader-store";
 import { cn } from "@/lib/utils";
-import { useQuery } from "convex/react";
+import { useQueryState } from "@/lib/data-hooks";
+import { supabase } from "@/lib/supabase";
 import {
   Bell,
   BookOpen,
@@ -10,7 +12,6 @@ import {
   House,
   Images,
   Library,
-  LogOut,
   Search,
   UserRound,
 } from "lucide-react";
@@ -40,8 +41,7 @@ const NAV = [
 ];
 
 export function AppShell() {
-  const data = useQuery(api.households.bootstrap);
-  const { signOut } = useAuth();
+  const { data, error } = useQueryState(api.households.bootstrap);
   const navigate = useNavigate();
   const location = useLocation();
   const onMemories = location.pathname.startsWith("/memories");
@@ -64,9 +64,19 @@ export function AppShell() {
 
   if (!data) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-3">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
         <BrandMark />
-        <p className="font-display text-lg">Opening your reading room…</p>
+        {error ? (
+          <div className="max-w-xl space-y-2">
+            <p className="font-display text-xl">{supabase ? "Finish setting up your library" : "Connect your Supabase project"}</p>
+            <p className="text-sm text-muted-foreground">
+              {supabase
+                ? "Run supabase/schema.sql in your Supabase SQL Editor, then refresh this page."
+                : "Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your local .env file and Vercel environment variables."}
+            </p>
+            <p className="break-words text-xs text-muted-foreground">{error.message}</p>
+          </div>
+        ) : <p className="font-display text-lg">Opening your reading room…</p>}
       </div>
     );
   }
@@ -184,20 +194,14 @@ export function AppShell() {
                 <DropdownMenuItem onSelect={() => navigate("/profiles")}>
                   Profiles & privacy
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => navigate("/profiles")}>
-                  Room & PIN access
+                <DropdownMenuItem onSelect={() => setReaderId(READER_IDS.whiskeyy)}>
+                  Use Whiskeyy profile
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => setReaderId(READER_IDS.matildaa)}>
+                  Use Matildaa profile
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => navigate("/memories")}>
                   Our memories
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onSelect={async () => {
-                    await signOut();
-                    navigate("/");
-                  }}
-                >
-                  <LogOut className="mr-2 size-3.5" /> Sign out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -253,7 +257,7 @@ export function AppShell() {
             </span>
             <span className="inline-flex items-center gap-2">
               <span className="ornament text-[0.6rem]">✦ ✦ ✦</span>
-              Private by design
+              Shared with anyone who has this link
             </span>
           </div>
         </footer>

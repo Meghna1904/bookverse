@@ -1,5 +1,6 @@
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
+import { api } from "@/lib/data-api";
+import type { Id } from "@/lib/db-types";
+import { requireSupabase } from "@/lib/supabase";
 import {
   BookCover,
   EmptyState,
@@ -38,7 +39,7 @@ import {
 import { errorMessage, formatDate, readingPercent } from "@/lib/bookverse";
 import { isPasswordError, openPdf } from "@/lib/pdf";
 import { cn } from "@/lib/utils";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "@/lib/data-hooks";
 import {
   BookOpen,
   FileText,
@@ -77,7 +78,6 @@ export default function Library() {
   const createDocument = useMutation(api.library.createDocument);
   const updateDocument = useMutation(api.library.updateDocument);
   const removeDocument = useMutation(api.library.removeDocument);
-  const generateUploadUrl = useMutation(api.library.generateUploadUrl);
   const completeDocument = useMutation(api.library.completeDocument);
 
   const [scope, setScope] = useState("all");
@@ -391,25 +391,22 @@ export default function Library() {
         onOpenChange={setUploadOpen}
         onUpload={async (payload) => {
           const uploadBlob = async (blob: Blob, name: string) => {
-            const url = await generateUploadUrl();
-            const response = await fetch(url, {
-              method: "POST",
-              headers: { "Content-Type": blob.type || "application/octet-stream" },
-              body: blob,
-            });
-            if (!response.ok) throw new Error("The upload was interrupted. Please retry.");
-            const result = (await response.json()) as { storageId: Id<"_storage"> };
-            void name;
-            return result.storageId;
+            const storage = requireSupabase().storage.from("bookverse-pdfs");
+            const path = `${Date.now()}-${crypto.randomUUID()}-${name}`;
+            const { error } = await storage.upload(path, blob, { contentType: blob.type || "application/octet-stream" });
+            if (error) throw error;
+            return path;
           };
-          const storageId = await uploadBlob(payload.file, payload.file.name);
-          let coverStorageId: Id<"_storage"> | undefined;
+          const storagePath = await uploadBlob(payload.file, payload.file.name);
+          let coverUrl: string | undefined;
           if (payload.cover) {
-            coverStorageId = await uploadBlob(payload.cover, "cover.jpg");
+            const coverPath = await uploadBlob(payload.cover, "cover.jpg");
+            coverUrl = requireSupabase().storage.from("bookverse-pdfs").getPublicUrl(coverPath).data.publicUrl;
           }
           await createDocument({
-            storageId,
-            coverStorageId,
+            storagePath,
+            size: payload.file.size,
+            coverUrl,
             fileName: payload.file.name,
             title: payload.title,
             author: payload.author,
@@ -471,17 +468,12 @@ export default function Library() {
                       }
                       setBusyCover(true);
                       try {
-                        const url = await generateUploadUrl();
-                        const response = await fetch(url, {
-                          method: "POST",
-                          headers: { "Content-Type": file.type },
-                          body: file,
-                        });
-                        if (!response.ok) throw new Error("The cover upload failed.");
-                        const { storageId } = (await response.json()) as {
-                          storageId: Id<"_storage">;
-                        };
-                        await updateDocument({ documentId: editing.documentId, coverStorageId: storageId });
+                        const storage = requireSupabase().storage.from("bookverse-pdfs");
+                        const path = `${Date.now()}-${crypto.randomUUID()}-${file.name}`;
+                        const { error } = await storage.upload(path, file, { contentType: file.type, upsert: true });
+                        if (error) throw error;
+                        const coverUrl = storage.getPublicUrl(path).data.publicUrl;
+                        await updateDocument({ documentId: editing.documentId, coverUrl });
                         toast.success("Cover image replaced.");
                       } catch (error) {
                         toast.error(errorMessage(error));

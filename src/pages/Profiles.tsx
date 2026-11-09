@@ -1,4 +1,4 @@
-import { api } from "@/convex/_generated/api";
+import { api } from "@/lib/data-api";
 import {
   Avatar,
   BookCover,
@@ -21,20 +21,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/use-auth";
 import { errorMessage, formatDate, formatMinutes, readingPercent } from "@/lib/bookverse";
 import { cn } from "@/lib/utils";
-import { useAction, useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "@/lib/data-hooks";
 import {
   Check,
   Flame,
   ImagePlus,
-  KeyRound,
   Loader2,
   Lock,
-  LogOut,
   Pencil,
-  ShieldCheck,
 } from "lucide-react";
 import { useRef, useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 import { toast } from "sonner";
 
 type Person = NonNullable<ReturnType<typeof useProfilesData>>["people"][number];
@@ -45,20 +42,11 @@ function useProfilesData() {
 
 export default function Profiles() {
   const data = useProfilesData();
-  const { signOut, readerSlot } = useAuth();
-  const navigate = useNavigate();
+  const { readerSlot } = useAuth();
   const renameLibrary = useMutation(api.households.renameLibrary);
-  const changeMyPin = useAction(api.pinAuth.changeMyPin);
-  const ownerResetPin = useAction(api.pinAuth.ownerResetPin);
   const [editing, setEditing] = useState<Person | null>(null);
   const [libraryName, setLibraryName] = useState("");
   const [nameOpen, setNameOpen] = useState(false);
-  const [pinMode, setPinMode] = useState<"change" | "reset" | null>(null);
-  const [currentPin, setCurrentPin] = useState("");
-  const [newPin, setNewPin] = useState("");
-  const [confirmPin, setConfirmPin] = useState("");
-  const [pinBusy, setPinBusy] = useState(false);
-  const [pinError, setPinError] = useState<string | null>(null);
 
   if (!data) {
     return <div className="h-80 animate-pulse rounded-lg bg-secondary/60" />;
@@ -66,42 +54,7 @@ export default function Profiles() {
 
   const me = data.people.find((person) => person.isMe);
   const partner = data.people.find((person) => !person.isMe);
-  const isRoomOwner = readerSlot === "whiskeyy";
-
-  const openPinDialog = (mode: "change" | "reset") => {
-    setPinMode(mode);
-    setCurrentPin("");
-    setNewPin("");
-    setConfirmPin("");
-    setPinError(null);
-  };
-
-  const savePin = async () => {
-    if (newPin.length !== 6) {
-      setPinError("Choose a new six-digit PIN.");
-      return;
-    }
-    if (newPin !== confirmPin) {
-      setPinError("The two new PINs do not match.");
-      return;
-    }
-    setPinBusy(true);
-    setPinError(null);
-    try {
-      if (pinMode === "change") {
-        await changeMyPin({ currentPin, newPin });
-        toast.success("Your room PIN has been changed.");
-      } else if (pinMode === "reset") {
-        await ownerResetPin({ slot: "matildaa", newPin });
-        toast.success(`${partner?.displayName ?? "Matildaa"}'s PIN has been reset.`);
-      }
-      setPinMode(null);
-    } catch (error) {
-      setPinError(errorMessage(error));
-    } finally {
-      setPinBusy(false);
-    }
-  };
+  void readerSlot;
 
   return (
     <div className="space-y-10 pb-6">
@@ -335,32 +288,14 @@ export default function Profiles() {
           <div className="mt-4 space-y-3">
             <div className="rounded-md border border-forest/20 bg-olive/8 px-3 py-2.5 text-[0.72rem] leading-relaxed text-muted-foreground">
               <p className="flex items-center gap-1.5 text-foreground">
-                <KeyRound className="size-3.5 text-olive" /> Two PIN-protected doors
+                <Lock className="size-3.5 text-olive" /> Shared two-reader room
               </p>
               <p className="mt-1">
-                This room is fixed to two readers. Each person enters through their own
-                six-digit PIN, and nobody can see anyone else&apos;s key.
+                Both readers use the same shared library. Choose the active reader from
+                the profile menu in the header.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-full text-[0.72rem]"
-                onClick={() => openPinDialog("change")}
-              >
-                <KeyRound className="mr-2 size-3.5" /> Change my PIN
-              </Button>
-              {isRoomOwner && partner ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="rounded-full text-[0.72rem]"
-                  onClick={() => openPinDialog("reset")}
-                >
-                  <ShieldCheck className="mr-2 size-3.5" /> Reset {partner.displayName}&apos;s PIN
-                </Button>
-              ) : null}
               <Button
                 variant="ghost"
                 size="sm"
@@ -378,9 +313,8 @@ export default function Profiles() {
                 <Lock className="size-3.5 text-olive" /> Privacy summary
               </p>
               <p className="mt-1">
-                {me?.displayName ?? "You"} can see shared documents, shared book records and
-                the household shelf. Private PDFs, private notes and each reader&apos;s PIN
-                are never exposed to the other reader or to any public page.
+                This no-sign-in version stores shared reading data in Supabase. Anyone
+                with the site URL can view and change that data.
               </p>
             </div>
           </div>
@@ -388,45 +322,21 @@ export default function Profiles() {
 
         <div className="space-y-5">
           <div className="paper-card rounded-lg p-5">
-            <SectionHeading eyebrow="Account" title="Sign-in & identity" />
+            <SectionHeading eyebrow="Reader" title="Current profile" />
             <dl className="mt-3 space-y-2 text-[0.76rem]">
               <div className="flex justify-between gap-3">
                 <dt className="text-muted-foreground">Reader</dt>
                 <dd>{me?.displayName}</dd>
               </div>
               <div className="flex justify-between gap-3">
-                <dt className="text-muted-foreground">Access</dt>
-                <dd className="inline-flex items-center gap-1.5">
-                  <KeyRound className="size-3 text-olive" />
-                  Six-digit PIN
-                </dd>
+                <dt className="text-muted-foreground">Sign-in</dt>
+                <dd>No account required</dd>
               </div>
               <div className="flex justify-between gap-3">
                 <dt className="text-muted-foreground">Partner</dt>
                 <dd>{partner?.displayName ?? "Matildaa"}</dd>
               </div>
             </dl>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="rounded-full"
-                onClick={async () => {
-                  await signOut();
-                  navigate("/");
-                }}
-              >
-                <LogOut className="mr-2 size-3.5" /> Sign out
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="rounded-full"
-                onClick={() => openPinDialog("change")}
-              >
-                <KeyRound className="mr-2 size-3.5" /> Change PIN
-              </Button>
-            </div>
           </div>
         </div>
       </section>
@@ -471,108 +381,6 @@ export default function Profiles() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={Boolean(pinMode)} onOpenChange={(open) => !open && setPinMode(null)}>
-        <DialogContent className="bg-card sm:max-w-sm">
-          <DialogHeader>
-            <p className="label-caps">Room keys</p>
-            <DialogTitle className="font-display text-2xl">
-              {pinMode === "reset"
-                ? `Reset ${partner?.displayName ?? "Matildaa"}'s PIN`
-                : "Change my PIN"}
-            </DialogTitle>
-            <DialogDescription>
-              {pinMode === "reset"
-                ? "Set a fresh six-digit PIN for your partner. Their existing PIN is never shown, and their other sessions are closed."
-                : "Enter your current PIN, then choose a new six-digit PIN. Nobody can read the PIN you already have."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-3">
-            {pinMode === "change" ? (
-              <div className="space-y-1.5">
-                <Label className="label-caps">Current PIN</Label>
-                <Input
-                  type="password"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={currentPin}
-                  onChange={(event) => {
-                    setPinError(null);
-                    setCurrentPin(event.target.value.replace(/\D/g, "").slice(0, 6));
-                  }}
-                  className="text-center font-mono tracking-[0.35em]"
-                  autoComplete="off"
-                />
-              </div>
-            ) : null}
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1.5">
-                <Label className="label-caps">New PIN</Label>
-                <Input
-                  type="password"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={newPin}
-                  onChange={(event) => {
-                    setPinError(null);
-                    setNewPin(event.target.value.replace(/\D/g, "").slice(0, 6));
-                  }}
-                  className="text-center font-mono tracking-[0.28em]"
-                  autoComplete="off"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="label-caps">Repeat PIN</Label>
-                <Input
-                  type="password"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={confirmPin}
-                  onChange={(event) => {
-                    setPinError(null);
-                    setConfirmPin(event.target.value.replace(/\D/g, "").slice(0, 6));
-                  }}
-                  className="text-center font-mono tracking-[0.28em]"
-                  autoComplete="off"
-                />
-              </div>
-            </div>
-            {pinError ? (
-              <p className="rounded-md border border-destructive/25 bg-destructive/5 px-3 py-2 text-[0.68rem] leading-relaxed text-destructive">
-                {pinError}
-              </p>
-            ) : null}
-            <p className="flex items-start gap-2 text-[0.64rem] leading-relaxed text-muted-foreground">
-              <Lock className="mt-0.5 size-3 shrink-0 text-olive" />
-              PINs are stored as salted PBKDF2 hashes. The room never reveals an existing
-              PIN.
-            </p>
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setPinMode(null)}>
-              Cancel
-            </Button>
-            <Button
-              className="rounded-full bg-forest text-primary-foreground"
-              disabled={
-                pinBusy ||
-                newPin.length !== 6 ||
-                confirmPin.length !== 6 ||
-                (pinMode === "change" && currentPin.length !== 6)
-              }
-              onClick={savePin}
-            >
-              {pinBusy ? (
-                <Loader2 className="mr-2 size-3.5 animate-spin" />
-              ) : (
-                <ShieldCheck className="mr-2 size-3.5" />
-              )}
-              Save PIN
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
@@ -586,7 +394,6 @@ function EditProfileDialog({
 }) {
   const updateProfile = useMutation(api.profiles.updateProfile);
   const saveAvatar = useMutation(api.households.saveAvatar);
-  const generateUploadUrl = useMutation(api.library.generateUploadUrl);
   const fileRef = useRef<HTMLInputElement>(null);
   const [displayName, setDisplayName] = useState(person?.displayName ?? "");
   const [bio, setBio] = useState(person?.bio ?? "");
@@ -618,17 +425,7 @@ function EditProfileDialog({
     }
     setUploading(true);
     try {
-      const url = await generateUploadUrl();
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": file.type },
-        body: file,
-      });
-      if (!response.ok) throw new Error("The image upload failed.");
-      const { storageId } = (await response.json()) as {
-        storageId: Parameters<typeof saveAvatar>[0]["storageId"];
-      };
-      await saveAvatar({ storageId });
+      await saveAvatar({ file });
       toast.success("Profile photograph updated.");
     } catch (error) {
       toast.error(errorMessage(error));

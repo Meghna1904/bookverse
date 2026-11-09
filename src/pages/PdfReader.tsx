@@ -1,12 +1,12 @@
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
+import { api } from "@/lib/data-api";
+import type { Id } from "@/lib/db-types";
 import { FinishDialog } from "@/components/bookverse/dialogs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { errorMessage, localDayKey, pdfUrl, readingPercent } from "@/lib/bookverse";
+import { errorMessage, localDayKey, readingPercent } from "@/lib/bookverse";
 import { isPasswordError, openPdf, pdfjs } from "@/lib/pdf";
 import { cn } from "@/lib/utils";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "@/lib/data-hooks";
 import {
   ArrowLeft,
   ChevronLeft,
@@ -31,7 +31,6 @@ export default function PdfReader() {
     api.library.get,
     documentId ? { documentId: documentId as Id<"libraryDocuments"> } : "skip",
   );
-  const issueToken = useMutation(api.library.issueToken);
   const saveProgress = useMutation(api.library.saveProgress);
   const completeDocument = useMutation(api.library.completeDocument);
 
@@ -73,10 +72,7 @@ export default function PdfReader() {
       setLoading(true);
       setLoadError(null);
       try {
-        const token = await issueToken({
-          documentId: documentId as Id<"libraryDocuments">,
-        });
-        const response = await fetch(pdfUrl(token));
+        const response = await fetch(meta.document.publicUrl);
         if (!response.ok) {
           throw new Error(
             response.status === 403
@@ -110,7 +106,7 @@ export default function PdfReader() {
     return () => {
       cancelled = true;
     };
-  }, [documentId, meta, pdf, issueToken, initialPage]);
+  }, [documentId, meta, pdf, initialPage]);
 
   const flushActivity = useCallback(
     async (force = false) => {

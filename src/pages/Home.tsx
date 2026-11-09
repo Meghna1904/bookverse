@@ -1,5 +1,5 @@
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
+import { api } from "@/lib/data-api";
+import type { Id } from "@/lib/db-types";
 import { HeroReadingScene } from "@/components/bookverse/HeroReadingScene";
 import {
   Avatar,
@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { timeAgo } from "@/lib/bookverse";
 import { cn } from "@/lib/utils";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery } from "@/lib/data-hooks";
 import {
   ArrowRight,
   BookMarked,

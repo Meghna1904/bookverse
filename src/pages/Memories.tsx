@@ -1,9 +1,9 @@
-import { api } from "@/convex/_generated/api";
-import type { Id } from "@/convex/_generated/dataModel";
+import { api } from "@/lib/data-api";
+import type { Id } from "@/lib/db-types";
 import { BookCover } from "@/components/bookverse/primitives";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { useQuery } from "convex/react";
+import { useQuery } from "@/lib/data-hooks";
 import {
   BookOpen,
   CheckCircle2,

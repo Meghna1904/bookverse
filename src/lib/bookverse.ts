@@ -1,4 +1,3 @@
-import { CONVEX_SITE_URL } from "./convex-url";
 
 export type CatalogueBook = {
   title: string;
@@ -253,10 +252,6 @@ export function coverPalette(key: string) {
   };
 }
 
-export function pdfUrl(token: string) {
-  return `${CONVEX_SITE_URL}/pdf?token=${encodeURIComponent(token)}`;
-}
-
 /** Remote catalogue: Google Books volumes, normalised into our book shape. */
 export type GoogleVolume = {
   id: string;
@@ -315,12 +310,7 @@ export const POPULAR_ISBNS = [
 
 export function errorMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error ?? "");
-  const cleaned = raw
-    .replace(/^\[CONVEX[^\]]*\]\s*/i, "")
-    .replace(/^Uncaught ConvexError:\s*/i, "")
-    .replace(/^ConvexError:\s*/i, "")
-    .trim();
-  return cleaned || "Something went wrong. Please try again.";
+  return raw.trim() || "Something went wrong. Please try again.";
 }
 
 export function verdict(percentA: number, percentB: number) {
