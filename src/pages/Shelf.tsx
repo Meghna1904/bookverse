@@ -340,9 +340,6 @@ export default function Shelf() {
       <PageHeader
         eyebrow="Our Shelf"
         title="Two shelves, one story."
-        description={`The books each of you has finished, kept as real spines on two walnut shelves — six to a row, alphabetically. A title read by both of you appears on both shelves, joined to one book record. ${
-          items.length
-        } volume${items.length === 1 ? "" : "s"} in the house.`}
         action={
           <Button asChild variant="outline" className="rounded-full border-forest/25">
             <Link to="/discover">
