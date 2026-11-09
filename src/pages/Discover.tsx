@@ -41,6 +41,7 @@ import {
   ArrowRight,
   BookOpen,
   Bookmark,
+  CheckCheck,
   Compass,
   Loader2,
   Plus,
@@ -139,6 +140,7 @@ export default function Discover() {
   const bootstrap = useQuery(api.households.bootstrap);
   const recent = useQuery(api.books.recentDiscoveries);
   const startReading = useMutation(api.books.startReading);
+  const markAsRead = useMutation(api.books.markAsRead);
   const addWish = useMutation(api.wishlist.add);
 
   const household =
@@ -290,7 +292,7 @@ export default function Discover() {
     };
   }, [filters]);
 
-  const runAction = async (action: "start" | "wishlist" | "together") => {
+  const runAction = async (action: "start" | "wishlist" | "together" | "read") => {
     if (!active) return;
     if (action === "together" && readers.length < 2) {
       toast.error("This household has one reader so far. Invite your partner first.");
@@ -307,6 +309,9 @@ export default function Discover() {
       if (action === "wishlist") {
         await addWish({ book: bookPayload(active), readerIds, priority });
         toast.success("Saved to the wishlist.");
+      } else if (action === "read") {
+        await markAsRead({ book: bookPayload(active), readerIds });
+        toast.success("Marked as read and added to your shelf.");
       } else {
         await startReading({
           book: bookPayload(active),
@@ -759,6 +764,14 @@ export default function Discover() {
                       onClick={() => runAction("wishlist")}
                     >
                       <Bookmark className="mr-2 size-4" /> Add to Wishlist
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="rounded-full"
+                      disabled={busy}
+                      onClick={() => runAction("read")}
+                    >
+                      <CheckCheck className="mr-2 size-4" /> Mark as Read
                     </Button>
                     <Button
                       variant="outline"

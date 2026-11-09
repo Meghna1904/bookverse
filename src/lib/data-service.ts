@@ -419,6 +419,42 @@ export async function runMutation(name: string, args: any): Promise<any> {
       result = await update("readingRecords", record.id, { status: "completed", completionDate: args.completionDate ?? timestamp, currentPage: book?.pageCount ?? record.currentPage, rating: args.rating, review: args.review ?? null, notes: args.notes ?? null, updatedAt: timestamp });
       await logActivity("finished", book?.title ?? "A book", "Finished reading", record.bookId); break;
     }
+    case "books.markAsRead": {
+      const book = await findOrCreateBook(args.book, true);
+      const readerIds = args.readerIds?.length ? args.readerIds : [readerId];
+      for (const id of readerIds) {
+        const old = (await records()).find((record) => record.bookId === book.id && record.readerId === id);
+        if (old) {
+          await update("readingRecords", old.id, {
+            status: "completed",
+            completionDate: timestamp,
+            currentPage: book.pageCount ?? old.currentPage,
+            source: "physical",
+            updatedAt: timestamp,
+          });
+        } else {
+          await insert("readingRecords", {
+            householdId: HOUSEHOLD_ID,
+            bookId: book.id,
+            readerId: id,
+            mode: readerIds.length > 1 ? "together" : "individual",
+            status: "completed",
+            source: "physical",
+            startDate: timestamp,
+            completionDate: timestamp,
+            currentPage: book.pageCount ?? 0,
+            isSample: false,
+            createdAt: timestamp,
+            updatedAt: timestamp,
+          });
+        }
+        const wish = (await wishes()).find((item) => item.bookId === book.id && item.readerId === id);
+        if (wish) await remove("wishlistItems", wish.id);
+      }
+      await logActivity("finished", book.title, "Marked as already read", book.id);
+      result = book.id;
+      break;
+    }
     case "books.saveReview": {
       const record = await one("readingRecords", args.recordId); if (!record) throw new Error("Reading record not found.");
       result = await update("readingRecords", record.id, { rating: args.rating ?? record.rating, review: args.review ?? record.review, notes: args.notes ?? record.notes, updatedAt: timestamp }); break;

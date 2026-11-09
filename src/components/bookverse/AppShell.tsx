@@ -32,10 +32,10 @@ import { ThemeToggle } from "./ThemeToggle";
 const NAV = [
   { to: "/home", label: "Home", icon: House },
   { to: "/shelf", label: "Our Shelf", icon: BookOpen },
-  { to: "/discover", label: "Discover", icon: Search, iconOnly: true },
   { to: "/library", label: "Library", icon: Library },
   { to: "/wishlist", label: "Wishlist", icon: Heart },
   { to: "/memories", label: "Our Memories", icon: Images },
+  { to: "/discover", label: "Discover", icon: Search, iconOnly: true },
   { to: "/stats", label: "Our Stats", icon: Bell, iconOnly: true },
   { to: "/profiles", label: "Profiles", icon: UserRound },
 ];
