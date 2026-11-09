@@ -1,6 +1,5 @@
 import { api } from "@/lib/data-api";
-import { READER_IDS } from "@/lib/db-types";
-import { setReaderId } from "@/lib/reader-store";
+import { lockRoom } from "@/lib/room-access";
 import { cn } from "@/lib/utils";
 import { useQueryState } from "@/lib/data-hooks";
 import { supabase } from "@/lib/supabase";
@@ -12,6 +11,7 @@ import {
   House,
   Images,
   Library,
+  LockKeyhole,
   Search,
   UserRound,
 } from "lucide-react";
@@ -194,14 +194,18 @@ export function AppShell() {
                 <DropdownMenuItem onSelect={() => navigate("/profiles")}>
                   Profiles & privacy
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setReaderId(READER_IDS.whiskeyy)}>
-                  Use Whiskeyy profile
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => setReaderId(READER_IDS.matildaa)}>
-                  Use Matildaa profile
-                </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => navigate("/memories")}>
                   Our memories
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={() => {
+                    lockRoom();
+                    navigate("/login", { replace: true });
+                  }}
+                >
+                  <LockKeyhole className="mr-2 size-3.5" />
+                  Lock reading room
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

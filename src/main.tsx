@@ -1,9 +1,11 @@
 import { ThemedToaster } from "@/components/bookverse/ThemeToggle";
 import React, { StrictMode, useEffect, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router";
+import { BrowserRouter, Navigate, Outlet, Route, Routes, useLocation } from "react-router";
 import { AppShell } from "./components/bookverse/AppShell";
 import { SiteDoodles } from "./components/bookverse/DoodleBackdrop";
+import Login from "./pages/Login";
+import { useRoomUnlocked } from "./lib/room-access";
 import "./index.css";
 
 // Lazy load route components for better code splitting
@@ -89,6 +91,15 @@ function RouteSyncer() {
   return null;
 }
 
+function RoomPinGuard() {
+  const unlocked = useRoomUnlocked();
+  const location = useLocation();
+  if (!unlocked) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
+  }
+  return <Outlet />;
+}
+
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
@@ -98,23 +109,26 @@ createRoot(document.getElementById("root")!).render(
           <SiteDoodles />
           <Suspense fallback={<RouteLoading />}>
             <Routes>
-              <Route path="/" element={<Navigate to="/home" replace />} />
-              <Route path="/auth" element={<Navigate to="/home" replace />} />
-              <Route path="/welcome" element={<Navigate to="/home" replace />} />
-              <Route path="/read/:documentId" element={<PdfReader />} />
-              <Route element={<AppShell />}>
-                <Route path="/home" element={<Home />} />
-                <Route path="/shelf" element={<Shelf />} />
-                <Route path="/book/:bookId" element={<BookDetail />} />
-                <Route path="/discover" element={<Discover />} />
-                <Route path="/library" element={<Library />} />
-                <Route path="/wishlist" element={<Wishlist />} />
-                <Route path="/memories" element={<Memories />} />
-                <Route path="/stats" element={<Stats />} />
-                <Route path="/profiles" element={<Profiles />} />
-                <Route path="/dashboard" element={<Navigate to="/home" replace />} />
+              <Route path="/login" element={<Login />} />
+              <Route element={<RoomPinGuard />}>
+                <Route path="/" element={<Navigate to="/home" replace />} />
+                <Route path="/auth" element={<Navigate to="/home" replace />} />
+                <Route path="/welcome" element={<Navigate to="/home" replace />} />
+                <Route path="/read/:documentId" element={<PdfReader />} />
+                <Route element={<AppShell />}>
+                  <Route path="/home" element={<Home />} />
+                  <Route path="/shelf" element={<Shelf />} />
+                  <Route path="/book/:bookId" element={<BookDetail />} />
+                  <Route path="/discover" element={<Discover />} />
+                  <Route path="/library" element={<Library />} />
+                  <Route path="/wishlist" element={<Wishlist />} />
+                  <Route path="/memories" element={<Memories />} />
+                  <Route path="/stats" element={<Stats />} />
+                  <Route path="/profiles" element={<Profiles />} />
+                  <Route path="/dashboard" element={<Navigate to="/home" replace />} />
+                </Route>
+                <Route path="*" element={<NotFound />} />
               </Route>
-              <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
       </BrowserRouter>

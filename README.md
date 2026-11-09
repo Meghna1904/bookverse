@@ -1,6 +1,6 @@
 # BookVerse
 
-A shared reading journal for two readers. The UI and application logic run in the Vite frontend on Vercel. Supabase provides the Postgres database and file storage; there is no custom server or sign-in flow.
+A shared reading journal for two readers. The UI and application logic run in the Vite frontend on Vercel. Supabase provides the Postgres database and file storage; there is no Supabase Auth or custom server. The app has one shared room PIN: `0101`.
 
 ## Set up Supabase
 
@@ -29,6 +29,6 @@ Build the production frontend with `npm run build`.
 
 ## Data access
 
-This app intentionally has no authentication. The SQL policies allow anyone with the Supabase project URL and public key to read, insert, update, and delete the app's rows and files. The Vercel URL is also not private access control. Use it only for data you are comfortable sharing with anyone who gets the link. Do not put Supabase service-role keys in Vite environment variables.
+The room PIN is a convenience lock in the frontend, not database security. The SQL policies allow anyone with the Supabase project URL and public key to read, insert, update, and delete the app's rows and files. The Vercel URL is also not private access control. Use it only for data you are comfortable sharing with anyone who gets the link. Do not put Supabase service-role keys in Vite environment variables.
 
 To change the schema, update `supabase/schema.sql` and apply the changes in the Supabase SQL Editor.
